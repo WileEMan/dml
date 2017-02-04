@@ -1,0 +1,3049 @@
+﻿/***
+    Copyright (c) 2012 by Wiley Black
+    All rights reserved.
+
+    This source code is made available under a custom license that I’m calling Open/Reference.  It is similar 
+    to a LGPL with the following major exceptions:
+        o	Binary-only uses do not require acknowledgment or credit (it is appreciated, however).
+        o	Tivoization is permitted as long as it does not violate other rights herein.
+        o	There are limitations on distribution of modified source code designed to protect the original 
+            author and to encourage changes to be routed through the original author.
+
+    Redistribution and use in binary forms, with or without modification, are permitted provided that the 
+    following conditions are met:
+        o   Agreement is accepted that omitting acknowledgment or copyright mention cannot be construed as a 
+            valid claim to the rights or ownership protected herein.
+
+    Public redistribution in source form with modification is not permitted.  
+
+    Distribution and use in source form with modification within an organization and its immediate identified 
+    partners are permitted provided the following conditions are met.  Distribution and use in source form with 
+    modification is permitted between recognized private partners provided the following conditions are met.  
+    Public or private redistribution and use in source form without modification is permitted provided the following 
+    conditions are met.    
+        o   Redistributions of source code, with or without modification, must retain the above copyright notice, 
+            this license, and the following disclaimer.
+        o   Modified source code must contain at least a one line prefix or postfix to this notice stating that it is 
+            a derived work and providing an Internet resource where the original may be obtained.  For example, 
+            “Derived from the original…” and a URL is sufficient.
+
+    Integration in larger works is considered a “use” and not a modification as long as no changes to the source were 
+    made.  Binary forms include compiled forms such as object representation (including that suitable for static linkage) 
+    and intermediate language representations.
+
+    Relicensing (such as bundling) of modified source and any binary forms are permitted but requires equal or more 
+    restrictive license terms and may not reassign ownership or rights of this source code.
+
+    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, 
+    INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+    DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, 
+    SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR 
+    SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, 
+    WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE 
+    USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.  
+***/
+
+using System;
+using System.Data;
+using System.IO;
+using System.Text;
+using System.Collections.Generic;
+using System.IO.Compression;
+using System.Security.Cryptography;
+using System.Xml;
+using WileyBlack.Platforms;
+using WileyBlack.Utility;
+using WileyBlack.Dml.EC;
+#if DEBUG
+using System.Diagnostics;
+#endif
+
+namespace WileyBlack.Dml
+{
+    /// <summary>
+    /// <para>Implements a reader for the Data Markup Language (DML).</para>
+    /// 
+    /// <para>The DmlReader is instantiated by a Create() call.  Repeated calls to Read() can then be made.
+    /// After each call to Read(), several properties are available that provide characterization
+    /// of the node.</para>
+    /// 
+    /// <para>After each call to Read() the caller may utilize one of the retrieval functions to gather the content
+    /// of the node, usually based on the properties describing it.  Methods are available for reading the 
+    /// content of attributes and elements.</para>
+    /// 
+    /// <para>If the node represents a container, then the properties available after the Read() call will
+    /// provide characteristics of the container such as name, and NodeType will return Container.  The DmlReader
+    /// will automatically descend into the container, but a navigation function called MoveOutOfContainer() is 
+    /// available to navigate out of the container without needing to read its contents.  If MoveOutOfContainer() is
+    /// not used, then Read() calls can continue within the container until an EndContainer node appears.  The
+    /// EndContainer node may represent an actual end marker (for variable-length containers), or it may be
+    /// generated by the DmlReader to signal that the end of a fixed-length container has been reached.</para>
+    /// 
+    /// <para>The DmlReader provides a series of Get..() methods.  These calls can be made once after a Read() call 
+    /// in order to retrieve the data content of the node.  If an node is not recognized or not 
+    /// interesting to the caller, the caller may proceed directly to the next Read() call to skip it.  The 
+    /// Get..() call made must match the node type in the stream or an exception is thrown.  The properties
+    /// available after the Read() call can be used to determine the node type prior to calling Get..().</para>
+    /// 
+    /// <para>The DmlReader provides limited navigation in order to support non-seeking streams and utilize
+    /// minimum memory state.  The in-memory types are also available for more flexible parsing.</para>
+    /// </summary>
+    /// 
+    /// <example>An example of DmlReader usage is provided:
+    /// <code>
+    /// DmlReader MyReader = DmlReader.Create(MyStream);    
+    /// while (MyReader.Read())
+    /// {
+    ///     switch (MyReader.NodeType)
+    ///     {
+    ///         case NodeTypes.Container:
+    ///             Console.Write("&lt;{0}", MyReader.Name); 
+    ///             break;
+    ///         case NodeTypes.EndAttributes: Console.Write("%gt;\n"); break;
+    ///         case NodeTypes.EndContainer: Console.Write("&lt;/{0}&gt;\n", MyReader.Container.Name); break;    
+    ///         case NodeTypes.Primitive: 
+    ///             if (MyReader.IsAttribute)
+    ///                 Console.Write(" {0}=\"{1}\"", MyReader.Name, MyReader.GetAsString());     
+    ///             else
+    ///                 Console.Write("\t&lt;{0}&gt;{1}&lt;/{0}&gt;\n", MyReader.Name, MyReader.GetAsString()); 
+    ///             break;    
+    ///         case NodeTypes.Comment:
+    ///             Console.Write("&lt;!-- {0} --&gt;\n", MyReader.GetComment();
+    ///             break;
+    ///     }
+    /// }
+    /// </code></example>
+    public class DmlReader : IDisposable
+    {
+        #region "Construction / Initialization / Control"
+
+        protected EndianBinaryReader Reader;        
+
+        public static DmlReader Create(Stream input)
+        {
+            DmlReader ret = new DmlReader();
+            ret.Reader = new EndianBinaryReader(input, false);
+            return ret;            
+        }
+
+        public static DmlReader Create(Stream Input, ParsingOptions Options)
+        {
+            DmlReader ret = new DmlReader();
+            ret.Reader = new EndianBinaryReader(Input, false);
+            ret.Options = Options;
+            return ret;
+        }
+
+        public static DmlReader Create(Stream Input, ParsingOptions Options, DmlContext Context)
+        {
+            DmlReader ret = new DmlReader();
+            ret.Reader = new EndianBinaryReader(Input, false);
+            ret.Options = Options;
+            ret.m_Container = Context;
+            return ret;
+        }
+
+        protected DmlReader()
+        {
+        }
+
+        public void Close() { Reader.Close(); }
+
+        public void Dispose()
+        {
+            Reader.Dispose();
+            GC.SuppressFinalize(this);
+        }
+
+        ~DmlReader()
+        {
+            if (Reader != null) { Reader.Dispose(); Reader = null; }
+        }
+
+        /// <summary>
+        /// Call AddPrimitiveSet() to attempt to enable a primitive set that is required for the DML document to
+        /// be read.  If a primitive set is not supported, an exception will be thrown.  Nodes with the requested
+        /// type(s) cannot be read until the codec is also specified.
+        /// </summary>
+        /// <param name="SetName">Primitive set required.</param>
+        public void AddPrimitiveSet(string SetName)
+        {
+            switch (SetName)
+            {                
+                case DmlInternalData.psBase: return;
+                case DmlInternalData.psCommon: return;
+                case DmlInternalData.psExtPrecision: throw CreateDmlException("Extended precision floating-point not supported by reader.");
+                case DmlInternalData.psDecimalFloat: throw CreateDmlException("Base-10 (Decimal) floating-point not supported by reader.");
+                case DmlInternalData.psArrays: return;
+                case DmlInternalData.psDecimalArray: throw CreateDmlException("Decimal floating-point arrays are not supported by reader.");
+                case DmlInternalData.psDmlEC: return;
+                default:
+                    try
+                    {
+                        foreach (IDmlReaderExtension Ext in Options.Extensions)
+                        {
+                            if (Ext.AddPrimitiveSet(SetName, null)) return;
+                        }
+                    }
+                    catch (Exception ex) { throw CreateDmlException(ex.Message, ex); }
+                    throw CreateDmlException("Primitive set not recognized by reader.");
+            }
+        }        
+
+        /// <summary>
+        /// Call AddPrimitiveSet() to attempt to enable a primitive set and matching codec that is required for 
+        /// the DML document to be read.  If a primitive set or codec is not supported, an exception will be thrown.
+        /// </summary>
+        /// <param name="SetName">Primitive set required.</param>
+        /// <param name="Codec">Codec name for primitive set.</param>
+        public void AddPrimitiveSet(string SetName, string Codec)
+        {
+            switch (SetName.ToLower())
+            {
+                case DmlInternalData.psBase: return;
+                case DmlInternalData.psCommon: 
+                    switch (Codec.ToLower())
+                    {
+                        case "le": Options.CommonCodec = Codecs.LE; return;
+                        case "be": Options.CommonCodec = Codecs.BE; return;
+                        default: throw CreateDmlException("Common primitive set codec is not recognized by reader.");
+                    }
+                case DmlInternalData.psExtPrecision: throw CreateDmlException("Extended precision floating-point not supported by reader.");
+                case DmlInternalData.psDecimalFloat: throw CreateDmlException("Base-10 (Decimal) floating-point not supported by reader.");
+                case DmlInternalData.psArrays:
+                    switch (Codec.ToLower())
+                    {
+                        case "le": Options.ArrayCodec = Codecs.LE; return;
+                        case "be": Options.ArrayCodec = Codecs.BE; return;
+                        default: throw CreateDmlException("Array/Matrix primitive set codec is not recognized by reader.");
+                    }
+                case DmlInternalData.psDecimalArray: throw CreateDmlException("Decimal floating-point arrays are not supported by reader.");
+                case DmlInternalData.psDmlEC:
+                    if (Codec.ToLower() != "v1") throw CreateDmlException("DML-EC codec is not recognized by reader.");
+                    return;
+                default:
+                    try
+                    {
+                        foreach (IDmlReaderExtension Ext in Options.Extensions)
+                        {
+                            if (Ext.AddPrimitiveSet(SetName, Codec)) return;
+                        }
+                    }
+                    catch (Exception ex) { throw CreateDmlException(ex.Message, ex); }
+                    throw CreateDmlException("Primitive set not recognized by reader.");
+            }
+        }
+
+        public void ConfigurePrimitiveSet(string SetName, string Codec, XmlReader Reader)
+        {
+            switch (SetName)
+            {
+                case DmlInternalData.psBase: return;
+                case DmlInternalData.psCommon: return;
+                case DmlInternalData.psExtPrecision: throw CreateDmlException("Extended precision floating-point not supported by reader.");
+                case DmlInternalData.psDecimalFloat: throw CreateDmlException("Base-10 (Decimal) floating-point not supported by reader.");
+                case DmlInternalData.psArrays: return;
+                case DmlInternalData.psDecimalArray: throw CreateDmlException("Decimal floating-point arrays are not supported by reader.");
+                case DmlInternalData.psDmlEC: return;
+                default:
+                    try
+                    {
+                        foreach (IDmlReaderExtension Ext in Options.Extensions)
+                        {
+                            if (Ext.AddPrimitiveSet(SetName, Codec))
+                            {
+                                Ext.Configure(SetName, Codec, Reader);
+                                return;
+                            }
+                        }
+                    }
+                    catch (Exception ex) { throw CreateDmlException(ex.Message, ex); }
+                    throw CreateDmlException("Primitive set not recognized by reader.");
+            }
+        }
+
+        public void ConfigurePrimitiveSet(string SetName, string Codec, DmlReader Reader)
+        {
+            switch (SetName)
+            {
+                case DmlInternalData.psBase: return;
+                case DmlInternalData.psCommon: return;
+                case DmlInternalData.psExtPrecision: throw CreateDmlException("Extended precision floating-point not supported by reader.");
+                case DmlInternalData.psDecimalFloat: throw CreateDmlException("Base-10 (Decimal) floating-point not supported by reader.");
+                case DmlInternalData.psArrays: return;
+                case DmlInternalData.psDecimalArray: throw CreateDmlException("Decimal floating-point arrays are not supported by reader.");
+                case DmlInternalData.psDmlEC: return;
+                default:
+                    try
+                    {
+                        foreach (IDmlReaderExtension Ext in Options.Extensions)
+                        {
+                            if (Ext.AddPrimitiveSet(SetName, Codec))
+                            {
+                                Ext.Configure(SetName, Codec, Reader);
+                                return;
+                            }
+                        }
+                    }
+                    catch (Exception ex) { throw CreateDmlException(ex.Message, ex); }
+                    throw CreateDmlException("Primitive set not recognized by reader.");
+            }
+        }
+
+        /// <summary>
+        /// Call AddPrimitiveSet() to attempt to enable a primitive set and matching codec that is required for 
+        /// the DML document to be read.  If a primitive set or codec is not supported, an exception will be thrown.
+        /// </summary>
+        /// <param name="Set">Primitive set required.</param>        
+        public void AddPrimitiveSet(PrimitiveSet Set)
+        {
+            if (Set.Codec != null) AddPrimitiveSet(Set.Set, Set.Codec);
+            else AddPrimitiveSet(Set.Set);
+        }
+
+        #endregion
+
+        #region "Properties"
+
+        /// <summary>
+        /// Provides the numeric DML Identifier of the node from the most recent Read() call.  To locate the XML-Compatible 
+        /// text name of an element, see the Name property of the DmlReader class instead.
+        /// </summary>
+        public UInt32 ID
+        {
+            get { return Association.DMLID; }
+        }
+
+        private DmlContext m_Container;
+
+        /// <summary>Provides the properties of the current container.  When the NodeType is NodeTypes.EndContainer this provides 
+        /// information on the container being closed.</summary>
+        public DmlContext Container
+        {
+            get { return m_Container; }
+        }        
+
+        /// <summary>Association provides the complete association for the node from the most recent Read() call.</summary>
+        public Association Association;
+
+        /// <summary>
+        /// Name provides the XML-Compatible name for the node from the most recent Read() call.
+        /// </summary>
+        public string Name
+        {
+            get {
+                return Association.DMLName.XmlName; 
+            }
+        }
+
+        /// <summary>
+        /// NodeType identifies the kind of node from the most recent Read() call.  
+        /// </summary>
+        public NodeTypes NodeType
+        {
+            get { return Association.DMLName.NodeType; }
+        }
+
+        /// <summary>
+        /// PrimitiveType identifies the data type of an attribute or element.  PrimitiveType can only be 
+        /// retrieved when the NodeType is NodeTypes.Primitive.
+        /// </summary>
+        public PrimitiveTypes PrimitiveType
+        {
+            get
+            {
+                if (Association == null)
+                    throw CreateDmlException("No node is currently open for reading.");
+                if (Association.DMLName.NodeType != NodeTypes.Primitive)
+                    throw CreateDmlException("The PrimitiveType property is only applicable to primitive type nodes.");
+                return Association.DMLName.PrimitiveType;
+            }
+        }
+
+        /// <summary>
+        /// ArrayType identifies the unit primitive of an array attribute or element.  When PrimitiveType is
+        /// not an Array or Matrix, ArrayType returns ArrayTypes.Unknown.
+        /// </summary>
+        public ArrayTypes ArrayType
+        {
+            get
+            {
+                if (PrimitiveType != PrimitiveTypes.Array && PrimitiveType != PrimitiveTypes.Matrix)
+                    return ArrayTypes.Unknown;
+                return Association.DMLName.ArrayType;
+            }
+        }
+
+        /// <summary>
+        /// When NodeOpen is true, a Read() call has been made and a Get..() call is possible.  When it is false, a Read() call
+        /// is allowed but a Get..() call will raise an exception.  NodeOpen (when true) indicates that we have parsed a node's 
+        /// head and are waiting to retrieve the node content.
+        /// </summary>
+        public bool NodeOpen { get { return Association != null && (Container == null || Association != Container.Association); } }
+
+        /// <summary>
+        /// IsAttribute (when true) indicates that the current node is part of the attribute list of the current container.  When
+        /// false, the current node is part of the elements list of the current container.
+        /// </summary>
+        public bool IsAttribute = false;
+
+        #endregion
+
+        #region "Parsing Options"
+
+        public ParsingOptions Options = new ParsingOptions();
+
+        #endregion
+
+        #region "Internal Parsing/Context Data"
+
+        /// <summary>
+        /// Used with data, encrypted, and decrypted nodes.
+        /// </summary>
+        Stream OutstandingStream = null;
+
+        #endregion
+
+        #region "Read() Method"
+
+        /// <summary>
+        /// The Read() function reads the node head for the next node.  The actual contents of the
+        /// node are retrieved by the Get..() calls or are skipped if another Read() call is made before
+        /// being retrieved.
+        /// </summary>
+        /// <returns>True if a node was read.  False if the end of the document has been reached.  Throws
+        /// exceptions if any format violation occurs.</returns>
+        public virtual bool Read()
+        {
+            FinishNode();
+            // FinishNode() ensures that Association is null upon successful return.
+            System.Diagnostics.Debug.Assert(!NodeOpen);
+
+            UInt32 DMLID;            
+            for (; ; )
+            {                
+                /** Read Identifier **/
+
+                try
+                {
+                    DMLID = Reader.ReadCompact32();
+                }
+                catch (EndOfStreamException) { return false; }
+                catch (Exception ex) { throw CreateDmlException(ex.Message, ex); }
+
+                // Handle special cases first...
+                switch (DMLID)
+                {
+                    case DML3Translation.idDMLEndAttributes:
+                        Association = DmlTranslation.DML3.EndAttributes;
+                        return true;
+                    case DML3Translation.idDMLEndContainer:                        
+                        if (Container == null || Container.OutOfBand) throw CreateDmlException("Mismatch between opening and closing of containers.");
+                        Association = DmlTranslation.DML3.EndContainer;
+                        return true;
+
+                    case DML3Translation.idDMLPaddingByte:
+                        if (Options.DiscardPadding) continue;
+                        else
+                        {
+                            Association = DmlTranslation.DML3.PaddingByte;
+                            return true;
+                        }
+
+                    case DML3Translation.idDMLPadding:
+                        if (Options.DiscardPadding)
+                        {                            
+                            UInt64 DataSize = Reader.ReadCompact64();
+                            if (DataSize == 0) continue;
+                            DiscardBytes(DataSize);                            
+                            continue;
+                        }
+                        else
+                        {
+                            Association = DmlTranslation.DML3.Padding;
+                            return true;
+                        }
+                }
+
+                // An EndOfStreamException anywhere beyond this first byte would mean an abruptly terminated
+                // stream, which should produce an exception instead of just end-of-file.
+
+                // Otherwise, we need to know the type to know how to decode it.                
+                Association CurrentAssociation;
+                if (DMLID == DML3Translation.idInlineIdentification)
+                    CurrentAssociation = ReadIdentificationInformation();
+                else if (!ActiveTranslation.TryFind(DMLID, out CurrentAssociation))
+                    throw CreateDmlException("Association for DMLID 0x" + DMLID.ToString("X2") + " not found in active DML translation.");
+
+                /** Process based on type **/
+
+                switch (CurrentAssociation.DMLName.NodeType)
+                {
+                    case NodeTypes.Container:
+                        DmlContext NewContainer = new DmlContext();
+                        NewContainer.m_Container = m_Container;
+                        NewContainer.Association = CurrentAssociation;
+                        if (Reader.BaseStream.CanSeek) NewContainer.StartPosition = Reader.BaseStream.Position;
+                        m_Container = NewContainer;
+                        Association = CurrentAssociation;
+                        IsAttribute = true;
+                        return true;
+
+                    case NodeTypes.Primitive:
+                        Association = CurrentAssociation;
+                        if (Association.DMLName.PrimitiveType == PrimitiveTypes.Extension) Association.DMLName.Extension.OpenNode(Association, Reader);
+                        return true;
+
+                    case NodeTypes.Comment:
+                        if (Options.DiscardComments)
+                        {
+                            UInt64 DataSize = Reader.ReadCompact64();
+                            DiscardBytes(DataSize);
+                            continue;
+                        }
+                        Association = DmlTranslation.DML3.Comment;
+                        return true;
+
+                    default: throw CreateDmlException("Unrecognized or disallowed node type in translation.");
+                }
+            }
+        }
+
+        protected virtual void FinishNode()
+        {
+            if (Association != null)
+            {
+                switch (NodeType)
+                {
+                    case NodeTypes.Primitive:
+                        switch (PrimitiveType)
+                        {
+                            case PrimitiveTypes.Array: SkipArray(); break;
+                            case PrimitiveTypes.Boolean: SkipBoolean(); break;
+                            case PrimitiveTypes.DateTime: SkipDateTime(); break;
+                            //case PrimitiveTypes.Decimal: SkipDecimal(); break;
+                            case PrimitiveTypes.Double: SkipDouble(); break;
+                            case PrimitiveTypes.Int: SkipInt(); break;
+                            case PrimitiveTypes.Matrix: SkipMatrix(); break;
+                            case PrimitiveTypes.Single: SkipSingle(); break;
+                            case PrimitiveTypes.String: SkipString(); break;
+                            case PrimitiveTypes.UInt: SkipUInt(); break;
+                            case PrimitiveTypes.EncryptedDML: SkipEncryptedDml(); break;
+                            case PrimitiveTypes.CompressedDML: SkipCompressedDml(); break;
+                            case PrimitiveTypes.Extension: Association.DMLName.Extension.CloseNode(Association, Reader); break;                                
+                            default: throw CreateDmlException("No codec skip action available for current node.");
+                        }
+                        Association = null;
+                        break;
+
+                    case NodeTypes.Comment: 
+                        SkipComment();
+                        Association = null;
+                        break;
+
+                    case NodeTypes.Padding:
+                        SkipPadding();
+                        Association = null;
+                        break;
+
+                    case NodeTypes.Container: 
+                        Association = null;
+                        break;
+
+                    case NodeTypes.EndAttributes:
+                        IsAttribute = false;
+                        Association = null;
+                        break;
+
+                    case NodeTypes.EndContainer:
+                        m_Container = m_Container.m_Container;
+                        Association = null;
+                        break;                    
+
+                    default:
+                        throw new NotSupportedException();
+                }
+            }
+        }
+
+        #endregion
+
+        #region "Association/Translation management"
+
+        public DmlTranslation GlobalTranslation = DmlTranslation.DML3.Clone();
+        
+        protected DmlTranslation ActiveTranslation
+        {
+            get
+            {
+                if (Container != null)
+                {
+                    if (Container.Association.LocalTranslation != null) return Container.Association.LocalTranslation;
+                    DmlContext Iter = Container.m_Container;
+                    while (Iter != null)
+                    {
+                        if (Iter.Association.LocalTranslation != null) return Iter.Association.LocalTranslation;
+                        Iter = Iter.m_Container;
+                    }
+                }
+                return GlobalTranslation;
+            }
+        }
+
+        #endregion
+
+        #region "Get..() Methods"
+
+        #region "Base primitives"
+        
+        /// <summary>
+        /// Retrieves the value for an unsigned integer primitive.
+        /// </summary>
+        /// <returns>Value</returns>
+        public UInt64 GetUInt()
+        {            
+            if (PrimitiveType != PrimitiveTypes.UInt) throw CreateDmlException("Node type does not match Get..() type.");
+            ulong Value = Reader.ReadCompact64();
+            Association = null;
+            return Value;
+        }
+
+        private void SkipUInt() { GetUInt(); }        
+
+        /// <summary>
+        /// Retrieves the value for a string primitive.
+        /// </summary>
+        /// <returns>Value</returns>
+        public string GetString()
+        {
+            try
+            {
+                if (PrimitiveType != PrimitiveTypes.String) throw CreateDmlException("Node type does not match Get..() type.");
+                UInt64 Length = Reader.ReadCompact64();
+                // This is an implementation limitation, not a limitation of DML.  Strings longer than 2^32 are unlikely
+                // anyway.
+                if (Length > int.MaxValue) throw CreateDmlException("Strings longer than 2^32 are not supported.");
+                byte[] Raw = Reader.ReadByte((int)Length);
+                Association = null;
+                return Encoding.UTF8.GetString(Raw);
+            }
+            catch (Exception ex)
+            {
+                if (!(ex is DmlException)) throw CreateDmlException(ex.Message, ex);
+                else throw ex;
+            }
+        }
+
+        private void SkipString()
+        {
+            try
+            {
+                if (PrimitiveType != PrimitiveTypes.String) throw CreateDmlException("Node type does not match Skip..() type.");
+                UInt64 Length = Reader.ReadCompact64();
+                DiscardBytes(Length);                
+                Association = null;                
+            }
+            catch (Exception ex)
+            {
+                if (!(ex is DmlException)) throw CreateDmlException(ex.Message, ex);
+                else throw ex;
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the value of byte arrays as a byte[].
+        /// </summary>
+        /// <returns>Data content</returns>
+        public byte[] GetByteArray()
+        {
+            if (PrimitiveType != PrimitiveTypes.Array
+             || ArrayType != ArrayTypes.U8) throw CreateDmlException("Cannot read array of a different type.");
+            if (OutstandingStream != null) throw CreateDmlException("Stream already exists for current node.");
+
+            UInt64 Elements = Reader.ReadCompact64();
+            // The 32-bit length limitation is imposed by C#'s Stream.Read() function, as well as the current implementations of
+            // the array readers in EndianBinaryReader.  Newer implementations could overcome this limitation.
+            if (Elements > int.MaxValue) throw CreateDmlException("Arrays with more than 2^32 elements are not supported.");
+            byte[] Value = Reader.ReadByte((int)Elements);
+            Association = null;
+            return Value;
+        }
+
+#       if false
+        /// <summary>
+        /// Retrieves part or all of the data contents into a caller supplied buffer.  An exception is thrown if the node 
+        /// is not a data element.  This overload can be called more than once per Read() call if the caller wishes to retrieve
+        /// the data in increments.  Each call advances the stream by the amount read.  The number of bytes read is returned,
+        /// which may be less than count if the end of the data element has been reached.
+        /// </summary>        
+        public int GetData(byte[] buffer, int index, int count)
+        {
+            if (PrimitiveType != PrimitiveTypes.Data) throw CreateDmlException("Node type does not match Get..() type.");
+            if (CurrentNode.Remaining <= 0) return 0;
+            if (CurrentNode.Remaining < (ulong)count) count = (int)CurrentNode.Remaining;
+            int nLength = Reader.Read(buffer, index, count);
+            if (nLength < count) throw CreateDmlException("End of stream without proper Dml termination", new EndOfStreamException());
+            Consume(count);
+            return count;
+        }
+#       endif        
+
+        /// <summary>
+        /// GetAsStream() retrieves the contents of a byte array node opened by the most recent Read() call as a Stream.  The Stream
+        /// can only be used until the next Read() call is issued.
+        /// </summary>
+        /// <returns>A stream representing the data in the array.</returns>
+        public Stream GetArrayAsStream()
+        {
+            if (PrimitiveType != PrimitiveTypes.Array
+             || ArrayType != ArrayTypes.U8) throw CreateDmlException("Node type does not match Get..() type.");
+            if (OutstandingStream != null) throw CreateDmlException("Stream already exists for current node.");
+            UInt64 Length = Reader.ReadCompact64();
+            StreamFragment ret = new StreamFragment(Reader.BaseStream, Length);
+            OutstandingStream = ret;
+            // We intentionally avoid setting Association = null so that SkipData() will be called if the user
+            // calls Read() again - giving us a chance to close out the node properly.
+            return ret;
+        }
+
+        private void SkipByteArray()
+        {            
+            if (PrimitiveType != PrimitiveTypes.Array
+             || ArrayType != ArrayTypes.U8) throw CreateDmlException("Node type does not match Get..() type.");
+
+            if (OutstandingStream != null)
+            {
+                StreamFragment sf = OutstandingStream as StreamFragment;
+                if (sf == null) throw CreateDmlException("Mismatched stream type at node closure.");
+                long Remaining = sf.Remaining;
+                OutstandingStream.Dispose(); 
+                OutstandingStream = null;
+                DiscardBytes((ulong)Remaining);
+                Association = null;
+            }
+            else
+            {
+                UInt64 Length = Reader.ReadCompact64();
+                DiscardBytes(Length);
+                Association = null;
+            }
+        }
+
+        #endregion
+
+        #region "Common primitives"
+
+        /// <summary>
+        /// Retrieves the value for a signed integer primitive.
+        /// </summary>
+        /// <returns>Value</returns>
+        public Int64 GetInt()
+        {
+            if (PrimitiveType != PrimitiveTypes.Int) throw CreateDmlException("Node type does not match Get..() type.");
+            long Value = Reader.ReadCompactS64();
+            Association = null;
+            return Value;
+        }
+
+        private void SkipInt() { GetInt(); }
+
+        /// <summary>
+        /// Retrieves the value for a boolean primitive.
+        /// </summary>
+        /// <returns>Value</returns>
+        public bool GetBoolean()
+        {
+            if (PrimitiveType != PrimitiveTypes.Boolean) throw CreateDmlException("Node type does not match Get..() type.");
+            bool Value = (Reader.ReadByte() != 0);
+            Association = null;
+            return Value;
+        }
+
+        private void SkipBoolean() { GetBoolean(); }
+
+        /// <summary>
+        /// Retrieves the value for a date/time primitive.
+        /// </summary>
+        /// <returns>Value</returns>
+        public DateTime GetDateTime()
+        {            
+            if (PrimitiveType != PrimitiveTypes.DateTime) throw CreateDmlException("Node type does not match Get..() type.");
+            if (Options.CommonCodec == Codecs.NotLoaded) throw CreateDmlException("A codec for the common primitive set has not been loaded by the DML stream.");
+            Reader.LittleEndian = (Options.CommonCodec == Codecs.LE);
+            UInt64 Value = Reader.ReadUI(8);
+            Association = null;
+            return DmlInternalData.ReferenceDate + new TimeSpan(((long)Value) / 100L);
+        }
+
+        private void SkipDateTime() { DiscardBytes(8); }
+        
+        /// <summary>
+        /// Retrieves the value for a single-precision floating-point primitive.
+        /// </summary>
+        /// <returns>Value</returns>
+        public float GetSingle()
+        {            
+            if (PrimitiveType != PrimitiveTypes.Single) throw CreateDmlException("Node type does not match Get..() type.");
+            if (Options.CommonCodec == Codecs.NotLoaded) throw CreateDmlException("A codec for the common primitive set has not been loaded by the DML stream.");
+            Reader.LittleEndian = (Options.CommonCodec == Codecs.LE);
+            float Value = Reader.ReadSingle();
+            Association = null;
+            return Value;
+        }
+
+        private void SkipSingle() { DiscardBytes(4); }
+
+        /// <summary>
+        /// Retrieves the value for a double-precision floating-point primitive.
+        /// </summary>
+        /// <returns>Value</returns>
+        public double GetDouble()
+        {            
+            if (PrimitiveType != PrimitiveTypes.Double) throw CreateDmlException("Node type does not match Get..() type.");
+            if (Options.CommonCodec == Codecs.NotLoaded) throw CreateDmlException("A codec for the common primitive set has not been loaded by the DML stream.");
+            Reader.LittleEndian = (Options.CommonCodec == Codecs.LE);
+            double Value = Reader.ReadDouble();
+            Association = null;
+            return Value;
+        }
+
+        private void SkipDouble() { DiscardBytes(8); }
+
+        #endregion
+
+        #region "Decimal-Float primitives"
+
+        /// <summary>
+        /// Retrieves the value for a base-10 (decimal) floating-point primitive.
+        /// </summary>
+        /// <returns>Value</returns>
+        public decimal GetDecimal()
+        {
+#           if false
+            if (PrimitiveType != PrimitiveTypes.Decimal) throw CreateDmlException("Node type does not match Get..() type.");
+            if (Options..... == Codecs.NotLoaded) throw CreateDmlException("A codec for the common primitive set has not been loaded by the DML stream.");
+            Reader.IsLittleEndian = (Options.CommonCodec == Codecs.LE);
+            decimal Value = Reader.ReadDecimal();
+            Association = null;
+            return Value;
+#           else
+            throw new NotImplementedException();
+#           endif
+        }
+
+        #endregion
+
+        #region "Array primitives"
+
+        private int StartArray(ArrayTypes AType)
+        {
+            if (ArrayType != AType) throw CreateDmlException("Cannot read array of a different type.");
+            if (Options.ArrayCodec == Codecs.NotLoaded) throw CreateDmlException("A codec for the arrays primitive set has not been loaded by the DML stream.");
+            Reader.LittleEndian = (Options.ArrayCodec == Codecs.LE);
+
+            UInt64 Elements = Reader.ReadCompact64();
+            // The 32-bit length limitation is imposed by C#'s Stream.Read() function, as well as the current implementations of
+            // the array readers in EndianBinaryReader.  Newer implementations could overcome this limitation.
+            if (Elements > int.MaxValue) throw CreateDmlException("Arrays with more than 2^32 elements are not supported.");
+            return (int)Elements;
+        }        
+
+        public UInt16[] GetUInt16Array()
+        {
+            int Elements = StartArray(ArrayTypes.U16);
+            UInt16[] Value = Reader.ReadUInt16(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public UInt32[] GetUInt24Array()
+        {
+            int Elements = StartArray(ArrayTypes.U24);
+            UInt32[] Value = Reader.ReadUInt24(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public UInt32[] GetUInt32Array()
+        {
+            int Elements = StartArray(ArrayTypes.U32);
+            UInt32[] Value = Reader.ReadUInt32(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public UInt64[] GetUInt64Array()
+        {
+            int Elements = StartArray(ArrayTypes.U64);
+            UInt64[] Value = Reader.ReadUInt64(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public sbyte[] GetSByteArray()
+        {
+            int Elements = StartArray(ArrayTypes.I8);
+            sbyte[] Value = Reader.ReadSByte(Elements);
+            Association = null;
+            return Value;            
+        }
+
+        public Int16[] GetInt16Array()
+        {
+            int Elements = StartArray(ArrayTypes.I16);
+            Int16[] Value = Reader.ReadInt16(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public Int32[] GetInt24Array()
+        {
+            int Elements = StartArray(ArrayTypes.I24);
+            Int32[] Value = Reader.ReadInt24(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public Int32[] GetInt32Array()
+        {
+            int Elements = StartArray(ArrayTypes.I32);
+            Int32[] Value = Reader.ReadInt32(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public Int64[] GetInt64Array()
+        {
+            int Elements = StartArray(ArrayTypes.I64);
+            Int64[] Value = Reader.ReadInt64(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public float[] GetSingleArray()
+        {
+            int Elements = StartArray(ArrayTypes.Singles);
+            float[] Value = Reader.ReadSingle(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public double[] GetDoubleArray()
+        {
+            int Elements = StartArray(ArrayTypes.Doubles);
+            double[] Value = Reader.ReadDouble(Elements);
+            Association = null;
+            return Value;
+        }
+
+        public DateTime[] GetDateTimeArray()
+        {
+            int Elements = StartArray(ArrayTypes.DateTimes);
+            Int64[] RawValue = Reader.ReadInt64(Elements);
+            Association = null;            
+            
+            DateTime[] Value = new DateTime[RawValue.Length];
+            for (int ii = 0; ii < RawValue.Length; ii++) Value[ii] = DmlInternalData.ReferenceDate + new TimeSpan(((long)RawValue[ii]) / 100L);
+            return Value;
+        }
+
+        private void SkipArray()
+        {
+            if (ArrayType == ArrayTypes.Strings) { SkipStringArray(); return; }
+            if (ArrayType == ArrayTypes.U8) { SkipByteArray(); return; }
+            UInt64 Elements = Reader.ReadCompact64();
+            UInt64 ElementSize;
+            switch (ArrayType)
+            {
+                case ArrayTypes.U8: ElementSize = 1; break;
+                case ArrayTypes.U16: ElementSize = 2; break;
+                case ArrayTypes.U24: ElementSize = 3; break;
+                case ArrayTypes.U32: ElementSize = 4; break;
+                case ArrayTypes.U64: ElementSize = 8; break;
+                case ArrayTypes.I8: ElementSize = 1; break;
+                case ArrayTypes.I16: ElementSize = 2; break;
+                case ArrayTypes.I24: ElementSize = 3; break;
+                case ArrayTypes.I32: ElementSize = 4; break;
+                case ArrayTypes.I64: ElementSize = 8; break;
+                case ArrayTypes.Singles: ElementSize = 4; break;
+                case ArrayTypes.Doubles: ElementSize = 8; break;
+                case ArrayTypes.DateTimes: ElementSize = 8; break;
+                default:
+                    throw CreateDmlException("Unsupported array type.");
+            }
+            DiscardBytes(Elements * ElementSize);
+        }
+
+        public string[] GetStringArray()
+        {
+            if (ArrayType != ArrayTypes.Strings) throw CreateDmlException("Cannot read array of a different type.");
+
+            string[] ret = new string [Reader.ReadCompact64()];
+            for (long ii=0; ii < ret.LongLength; ii++)
+            {
+                UInt64 NBytes = Reader.ReadCompact64();                
+                if (NBytes > (uint)int.MaxValue) throw CreateDmlException("String exceeds maximum supported length.");                
+                byte[] Raw = Reader.ReadByte((int)NBytes);
+                ret[ii] = Encoding.UTF8.GetString(Raw);
+            }
+
+            Association = null;
+            return ret;
+        }
+
+        private void SkipStringArray()
+        {
+            if (ArrayType != ArrayTypes.Strings) throw CreateDmlException("Cannot read array of a different type.");
+
+            ulong StrCount = Reader.ReadCompact64();
+            for (ulong ii=0; ii < StrCount; ii++)
+            {
+                UInt64 NBytes = Reader.ReadCompact64();                
+                DiscardBytes(NBytes);
+            }
+        }
+
+        #endregion
+
+        #region "Matrix primitives"
+
+        private void StartMatrix(ArrayTypes AType, out int Dimension0, out int Dimension1)
+        {
+            // Note that in float[,] TestExample = new float[3, 2]:
+            //  TestExample.GetLength(0) is 3.  (Dimension0)
+            //  TestExample.GetLength(1) is 2.  (Dimension1)
+            // EndianBinaryWriter iterates faster on dimension1 than dimension0.  That is,
+            // EndianBinaryWriter would output TestExample[0,0], TestExample[0,1], TestExample[1,0], ...
+            // Since DML specifies row-major format, the rows are therefore dimension 1.
+
+            if (ArrayType != AType) throw CreateDmlException("Cannot read matrix of a different type.");
+            if (Options.ArrayCodec == Codecs.NotLoaded) throw CreateDmlException("A codec for the arrays primitive set has not been loaded by the DML stream.");
+            Reader.LittleEndian = (Options.ArrayCodec == Codecs.LE);
+
+            UInt64 ulDimension0 = Reader.ReadCompact64();        // Columns
+            UInt64 ulDimension1 = Reader.ReadCompact64();        // Rows
+            // The 32-bit length limitation is imposed by C#'s Stream.Read() function, as well as the current implementations of
+            // the array readers in EndianBinaryReader.  Newer implementations could overcome this limitation.
+            if (ulDimension0 > int.MaxValue) throw CreateDmlException("Matrices with more than 2^32 elements in one dimension are not supported by current implementation.");
+            if (ulDimension1 > int.MaxValue) throw CreateDmlException("Matrices with more than 2^32 elements in one dimension are not supported by current implementation.");
+            Dimension0 = (int)ulDimension0;
+            Dimension1 = (int)ulDimension1;
+        }
+
+        private void SkipMatrix()
+        {            
+            UInt64 Dimension0 = Reader.ReadCompact64();
+            UInt64 Dimension1 = Reader.ReadCompact64();
+            UInt64 ElementSize;
+            switch (ArrayType)
+            {
+                case ArrayTypes.U8: ElementSize = 1; break;
+                case ArrayTypes.U16: ElementSize = 2; break;
+                case ArrayTypes.U24: ElementSize = 3; break;
+                case ArrayTypes.U32: ElementSize = 4; break;
+                case ArrayTypes.U64: ElementSize = 8; break;
+                case ArrayTypes.I8: ElementSize = 1; break;
+                case ArrayTypes.I16: ElementSize = 2; break;
+                case ArrayTypes.I24: ElementSize = 3; break;
+                case ArrayTypes.I32: ElementSize = 4; break;
+                case ArrayTypes.I64: ElementSize = 8; break;
+                case ArrayTypes.Singles: ElementSize = 4; break;
+                case ArrayTypes.Doubles: ElementSize = 8; break;
+                default: throw CreateDmlException("Unsupported matrix type.");
+            }
+            DiscardBytes(Dimension0 * Dimension1 * ElementSize);
+        }
+
+        public byte[,] GetByteMatrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.U8, out Dim0, out Dim1);
+            byte[,] Value = Reader.ReadByte(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public ushort[,] GetUInt16Matrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.U16, out Dim0, out Dim1);
+            ushort[,] Value = Reader.ReadUInt16(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public uint[,] GetUInt24Matrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.U24, out Dim0, out Dim1);
+            uint[,] Value = Reader.ReadUInt24(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public uint[,] GetUInt32Matrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.U32, out Dim0, out Dim1);
+            uint[,] Value = Reader.ReadUInt32(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public ulong[,] GetUInt64Matrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.U64, out Dim0, out Dim1);
+            ulong[,] Value = Reader.ReadUInt64(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public sbyte[,] GetSByteMatrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.I8, out Dim0, out Dim1);
+            sbyte[,] Value = Reader.ReadSByte(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public short[,] GetInt16Matrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.I16, out Dim0, out Dim1);
+            short[,] Value = Reader.ReadInt16(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public int[,] GetInt24Matrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.I24, out Dim0, out Dim1);
+            int[,] Value = Reader.ReadInt24(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public int[,] GetInt32Matrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.I32, out Dim0, out Dim1);
+            int[,] Value = Reader.ReadInt32(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public long[,] GetInt64Matrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.I64, out Dim0, out Dim1);
+            long[,] Value = Reader.ReadInt64(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public float[,] GetSingleMatrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.Singles, out Dim0, out Dim1);
+            float[,] Value = Reader.ReadSingle(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+
+        public double[,] GetDoubleMatrix()
+        {
+            int Dim0, Dim1;
+            StartMatrix(ArrayTypes.Doubles, out Dim0, out Dim1);
+            double[,] Value = Reader.ReadDouble(Dim0, Dim1);
+            Association = null;
+            return Value;
+        }
+        
+        #endregion
+
+        #region "Extension primitives"
+
+        /// <summary>
+        /// GetExtension() retrieves the extension currently handling the open node.  An exception is thrown if a node is not
+        /// presently open (following a Read() call) or if the node does not utilize an extension (check that PrimitiveType is
+        /// PrimitiveTypes.Extension before calling.)  The extension class can provide additional ancillary information about
+        /// the node prior to deciding whether to call GetExtended() to retrieve the node's content.  For example, if the
+        /// extension handles images, then GetExtension() and the extension class might provide width and height information
+        /// while the GetExtended() call provides the actual Bitmap object from the node.
+        /// </summary>
+        /// <returns>The extension which is handling the extension node from the most recent Read() call.</returns>
+        public IDmlReaderExtension GetExtension()
+        {
+            if (PrimitiveType != PrimitiveTypes.Extension) throw CreateDmlException("Node type does not match Get..() type.");
+            if (Association.DMLName.Extension == null) throw CreateDmlException("No extension is handling this node.");
+            return Association.DMLName.Extension;
+        }
+
+        /// <summary>
+        /// The GetExtended() method retrieves the contents of the extension node.  The GetExtension() class may be useful
+        /// for retrieving ancillary information about the node prior to calling GetExtended().
+        /// </summary>
+        /// <seealso>GetExtension()</seealso>
+        /// <returns>The node's content in the format provided by the extension.</returns>
+        public object GetExtended()
+        {
+            if (PrimitiveType != PrimitiveTypes.Extension) throw CreateDmlException("Node type does not match Get..() type.");
+            if (Association.DMLName.Extension == null) throw CreateDmlException("No extension is handling this node.");            
+            return Association.DMLName.Extension.GetNode(Association, Reader);
+        }
+
+        #endregion
+
+        #endregion
+
+        #region "Other Readers"
+
+        /// <summary>
+        /// Retrieves the text for a comment node.        
+        /// </summary>
+        /// <returns>Comment text</returns>
+        public string GetComment()
+        {
+            try
+            {
+                if (NodeType != NodeTypes.Comment) throw CreateDmlException("Node type does not match Get..() type.");
+                UInt64 Length = Reader.ReadCompact64();
+                // This is an implementation limitation, not a limitation of DML.  Strings longer than 2^32 are unlikely
+                // anyway.
+                if (Length > int.MaxValue) throw CreateDmlException("Strings longer than 2^32 are not supported.");
+                byte[] Raw = Reader.ReadByte((int)Length);
+                Association = null;
+                return Encoding.UTF8.GetString(Raw);
+            }
+            catch (Exception ex)
+            {
+                if (!(ex is DmlException)) throw CreateDmlException(ex.Message, ex);
+                else throw ex;
+            }
+        }        
+
+        private void SkipComment()
+        {
+            try
+            {
+                if (NodeType != NodeTypes.Comment) throw CreateDmlException("Node type does not match Skip..() type.");
+                UInt64 Length = Reader.ReadCompact64();
+                DiscardBytes(Length);
+            }
+            catch (Exception ex)
+            {
+                if (!(ex is DmlException)) throw CreateDmlException(ex.Message, ex);
+                else throw ex;
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the size of a padding node, including the bytes used for the data size but not counting 
+        /// the node head.  For single-byte padding, returns zero.
+        /// </summary>
+        /// <returns>The size, in bytes, of the padding content and padding data size indicator.</returns>
+        public UInt64 GetPaddingSize()
+        {
+            try
+            {
+                if (NodeType != NodeTypes.Padding) throw CreateDmlException("Node type does not match Get..() type.");
+                if (ID == DML3Translation.idDMLPaddingByte) { Association = null; return 0; }
+
+                // By process of elimination, must be a idDMLPadding node with size given next.
+                System.Diagnostics.Debug.Assert(ID == DML3Translation.idDMLPadding);
+                Association = null;
+
+                UInt64 Length = Reader.ReadCompact64();
+                DiscardBytes(Length);
+                return Length + (ulong)EndianBinaryWriter.SizeCompact64(Length);                                
+            }
+            catch (Exception ex)
+            {
+                if (!(ex is DmlException)) throw CreateDmlException(ex.Message, ex);
+                else throw ex;
+            }
+        }
+        
+        private void SkipPadding()
+        {
+            try
+            {
+                if (NodeType != NodeTypes.Padding) throw CreateDmlException("Node type does not match Get..() type.");                
+                if (ID == DML3Translation.idDMLPadding)                 
+                {
+                    UInt64 Length = Reader.ReadCompact64();
+                    DiscardBytes(Length);
+                }
+            }
+            catch (Exception ex)
+            {
+                if (!(ex is DmlException)) throw CreateDmlException(ex.Message, ex);
+                else throw ex;
+            }
+        }
+
+        #endregion
+
+        #region "Get..() readers with conversion"
+
+        /// <summary>
+        /// Retrieves the value of the current node as a general object.  An exception is thrown if the
+        /// node is not an attribute or primitive which is recognized and available as as object.  Primitive
+        /// types will return the associated C# base type (i.e. if the primitive is an integer, then a
+        /// C# long will be returned.)  Encrypted nodes will throw an exception using GetAsObject(), since 
+        /// a key is required for retrieval.  Compressed nodes will return a DmlReader.  For extension
+        /// nodes, the return value will be the same as for a GetExtended() call.
+        /// </summary>
+        /// <returns>An object containing the value.</returns>
+        public object GetAsObject()
+        {
+            switch (PrimitiveType)
+            {
+                case PrimitiveTypes.Array:
+                    switch (ArrayType)
+                    {
+                        case ArrayTypes.U8: return GetByteArray();
+                        case ArrayTypes.U16: return GetUInt16Array();
+                        case ArrayTypes.U24: return GetUInt24Array();
+                        case ArrayTypes.U32: return GetUInt32Array();
+                        case ArrayTypes.U64: return GetUInt64Array();
+                        case ArrayTypes.I8: return GetSByteArray();
+                        case ArrayTypes.I16: return GetInt16Array();
+                        case ArrayTypes.I24: return GetInt24Array();
+                        case ArrayTypes.I32: return GetInt32Array();
+                        case ArrayTypes.I64: return GetInt64Array();
+                        // case ArrayTypes.Decimals: return GetDecimalArray();
+                        case ArrayTypes.Singles: return GetSingleArray();
+                        case ArrayTypes.Doubles: return GetDoubleArray();
+                        case ArrayTypes.DateTimes: return GetDateTimeArray();
+                        case ArrayTypes.Strings: return GetStringArray();
+                        default:
+                        case ArrayTypes.Unknown:
+                            throw CreateDmlException("Cannot retrieve unrecognized array type using GetAsObject.");
+                    }
+                case PrimitiveTypes.Matrix:
+                    switch (ArrayType)
+                    {
+                        case ArrayTypes.U8: return GetByteMatrix();
+                        case ArrayTypes.U16: return GetUInt16Matrix();
+                        case ArrayTypes.U24: return GetUInt24Matrix();
+                        case ArrayTypes.U32: return GetUInt32Matrix();
+                        case ArrayTypes.U64: return GetUInt64Matrix();
+                        case ArrayTypes.I8: return GetSByteMatrix();
+                        case ArrayTypes.I16: return GetInt16Matrix();
+                        case ArrayTypes.I24: return GetInt24Matrix();
+                        case ArrayTypes.I32: return GetInt32Matrix();
+                        case ArrayTypes.I64: return GetInt64Matrix();
+                        // case ArrayTypes.Decimals: return GetDecimalMatrix();
+                        case ArrayTypes.Singles: return GetSingleMatrix();
+                        case ArrayTypes.Doubles: return GetDoubleMatrix();
+                        default:
+                        case ArrayTypes.Unknown:
+                            throw CreateDmlException("Cannot retrieve unrecognized matrix type using GetAsObject.");
+                    }
+                case PrimitiveTypes.Boolean: return GetBoolean();
+                case PrimitiveTypes.CompressedDML: return GetCompressedDml();
+                case PrimitiveTypes.DateTime: return GetDateTime();
+                case PrimitiveTypes.Decimal: return GetDecimal();
+                case PrimitiveTypes.Double: return GetDouble();
+                case PrimitiveTypes.EncryptedDML: throw CreateDmlException("Cannot retrieve an encrypted node using GetAsObject.");
+                case PrimitiveTypes.Extension: return GetExtended();
+                case PrimitiveTypes.Int: return GetInt();                
+                case PrimitiveTypes.Single: return GetSingle();
+                case PrimitiveTypes.String: return GetString();
+                case PrimitiveTypes.UInt: return GetUInt();
+                default:
+                case PrimitiveTypes.Unknown:
+                    throw CreateDmlException("Cannot retrieve non-primitive or unrecognized primitive type using GetAsObject.");
+            }
+        }
+
+        #region "Base primitives with conversions"
+
+        /// <summary>
+        /// Retrieves the value of the current node with conversion to an unsigned integer.  An exception is thrown if the
+        /// node is not an attribute or primitive of a compatible numeric type.
+        /// </summary>
+        /// <returns>The unsigned integer form of the value.</returns>
+        public uint GetAsUInt()
+        {
+            switch (PrimitiveType)
+            {
+                case PrimitiveTypes.Int: return (uint)GetInt();
+                case PrimitiveTypes.UInt: return (uint)GetUInt();
+                case PrimitiveTypes.Single: return (uint)GetSingle();
+                case PrimitiveTypes.Double: return (uint)GetDouble();
+                case PrimitiveTypes.Decimal: return (uint)GetDecimal();
+                case PrimitiveTypes.Boolean: return GetBoolean() ? 1U : 0U;
+                default: throw CreateDmlException("Unable to retrieve as numeric type.");
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the value of the current node with conversion to an unsigned long.  An exception is thrown if the
+        /// node is not an attribute or primitive of a compatible numeric type.
+        /// </summary>
+        /// <returns>The unsigned long form of the value.</returns>
+        public ulong GetAsULong()
+        {
+            switch (PrimitiveType)
+            {
+                case PrimitiveTypes.Int: return (ulong)GetInt();
+                case PrimitiveTypes.UInt: return (ulong)GetUInt();
+                case PrimitiveTypes.Single: return (ulong)GetSingle();
+                case PrimitiveTypes.Double: return (ulong)GetDouble();
+                case PrimitiveTypes.Decimal: return (ulong)GetDecimal();
+                case PrimitiveTypes.Boolean: return GetBoolean() ? 1UL : 0UL;
+                default: throw CreateDmlException("Unable to retrieve as numeric type.");
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the value of the current node with conversion to an integer.  An exception is thrown if the
+        /// node is not an attribute or primitive of a compatible numeric type.
+        /// </summary>
+        /// <returns>The integer form of the value.</returns>
+        public int GetAsInt()
+        {
+            switch (PrimitiveType)
+            {
+                case PrimitiveTypes.Int: return (int)GetInt();
+                case PrimitiveTypes.UInt: return (int)GetUInt();
+                case PrimitiveTypes.Single: return (int)GetSingle();
+                case PrimitiveTypes.Double: return (int)GetDouble();
+                case PrimitiveTypes.Decimal: return (int)GetDecimal();
+                case PrimitiveTypes.Boolean: return GetBoolean() ? 1 : 0;
+                default: throw CreateDmlException("Unable to retrieve as numeric type.");
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the value of the current node with conversion to a long.  An exception is thrown if the
+        /// node is not an attribute or primitive of a compatible numeric type.
+        /// </summary>
+        /// <returns>The long form of the value.</returns>
+        public long GetAsLong()
+        {
+            switch (PrimitiveType)
+            {
+                case PrimitiveTypes.Int: return (long)GetInt();
+                case PrimitiveTypes.UInt: return (long)GetUInt();
+                case PrimitiveTypes.Single: return (long)GetSingle();
+                case PrimitiveTypes.Double: return (long)GetDouble();
+                case PrimitiveTypes.Decimal: return (long)GetDecimal();
+                case PrimitiveTypes.Boolean: return GetBoolean() ? 1L : 0L;
+                default: throw CreateDmlException("Unable to retrieve as numeric type.");
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the value of the current node with conversion to a single-precision float.  An exception is thrown if the
+        /// node is not an attribute or primitive of a compatible numeric type.
+        /// </summary>
+        /// <returns>The float form of the value.</returns>
+        public float GetAsSingle()
+        {
+            switch (PrimitiveType)
+            {
+                case PrimitiveTypes.Int: return (float)GetInt();
+                case PrimitiveTypes.UInt: return (float)GetUInt();
+                case PrimitiveTypes.Single: return (float)GetSingle();
+                case PrimitiveTypes.Double: return (float)GetDouble();
+                case PrimitiveTypes.Decimal: return (float)GetDecimal();
+                case PrimitiveTypes.Boolean: return GetBoolean() ? 1.0f : 0.0f;
+                default: throw CreateDmlException("Unable to retrieve as numeric type.");
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the value of the current node with conversion to a double-precision floating-point value.  An exception is thrown if the
+        /// node is not an attribute or primitive of a compatible numeric type.
+        /// </summary>
+        /// <returns>The double form of the value.</returns>
+        public double GetAsDouble()
+        {
+            switch (PrimitiveType)
+            {
+                case PrimitiveTypes.Int: return (double)GetInt();
+                case PrimitiveTypes.UInt: return (double)GetUInt();
+                case PrimitiveTypes.Single: return (double)GetSingle();
+                case PrimitiveTypes.Double: return (double)GetDouble();
+                case PrimitiveTypes.Decimal: return (double)GetDecimal();
+                case PrimitiveTypes.Boolean: return GetBoolean() ? 1.0 : 0.0;
+                default: throw CreateDmlException("Unable to retrieve as numeric type.");
+            }
+        }
+
+        /// <summary>
+        /// Retrieves the value of the current node with conversion to a string.  An exception is thrown if the
+        /// node is not an attribute or primitive of a compatible type.
+        /// </summary>
+        /// <returns>The string representation of the value.</returns>
+        public string GetAsString()
+        {
+            switch (PrimitiveType)
+            {
+                case PrimitiveTypes.Int: return GetInt().ToString();
+                case PrimitiveTypes.UInt: return GetUInt().ToString();
+                case PrimitiveTypes.Single: return GetSingle().ToString();
+                case PrimitiveTypes.Double: return GetDouble().ToString();
+                case PrimitiveTypes.Decimal: return GetDecimal().ToString();
+                case PrimitiveTypes.Boolean: return GetBoolean().ToString();
+                case PrimitiveTypes.DateTime: return GetDateTime().ToString();
+                case PrimitiveTypes.String: return GetString();
+                case PrimitiveTypes.Array: 
+                    if (ArrayType == ArrayTypes.U8) return Convert.ToBase64String(GetByteArray());
+                    else throw CreateDmlException("Unable to retrieve as string type.");
+                default: throw CreateDmlException("Unable to retrieve as string type.");
+            }
+        }
+
+        #endregion
+
+        #region "Array Primitives with Conversions"
+
+        public int[] GetArrayAsInt()
+        {
+            int[] ret;
+            switch (ArrayType)
+            {
+                case ArrayTypes.U8:
+                    {
+                        byte[] src = GetByteArray();
+                        ret = new int[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U16:
+                    {
+                        UInt16[] src = GetUInt16Array();
+                        ret = new int[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U24:
+                    {
+                        UInt32[] src = GetUInt24Array();
+                        ret = new int[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = (int)src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U32:
+                    {
+                        UInt32[] src = GetUInt32Array();
+                        ret = new int[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = (int)src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U64:
+                    {
+                        UInt64[] src = GetUInt64Array();
+                        ret = new int[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = (int)src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I8:
+                    {
+                        sbyte[] src = GetSByteArray();
+                        ret = new int[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I16:
+                    {
+                        Int16[] src = GetInt16Array();
+                        ret = new int[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I24:
+                    {
+                        Int32[] src = GetInt24Array();
+                        ret = new int[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I32: return GetInt32Array();
+
+                case ArrayTypes.I64:
+                    {
+                        Int64[] src = GetInt64Array();
+                        ret = new int[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = (int)src[ii];
+                        return ret;
+                    }
+
+                default:
+                    throw CreateDmlException("Cannot retrieve this array as an integral type.");
+            }
+        }
+
+        public float[] GetArrayAsSingle()
+        {
+            float[] ret;
+            switch (ArrayType)
+            {
+                case ArrayTypes.U8:
+                    {
+                        byte[] src = GetByteArray();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U16:
+                    {
+                        UInt16[] src = GetUInt16Array();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U24:
+                    {
+                        UInt32[] src = GetUInt24Array();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U32:
+                    {
+                        UInt32[] src = GetUInt32Array();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U64:
+                    {
+                        UInt64[] src = GetUInt64Array();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I8:
+                    {
+                        sbyte[] src = GetSByteArray();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I16:
+                    {
+                        Int16[] src = GetInt16Array();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I24:
+                    {
+                        Int32[] src = GetInt24Array();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I32:
+                    {
+                        Int32[] src = GetInt32Array();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I64:
+                    {
+                        Int64[] src = GetInt64Array();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.Singles: return GetSingleArray();
+
+                case ArrayTypes.Doubles:
+                    {
+                        double[] src = GetDoubleArray();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = (float)src[ii];
+                        return ret;
+                    }
+
+#               if false
+                case ArrayTypes.Decimals:
+                    {
+                        decimal[] src = GetDecimalArray();
+                        ret = new float[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = (float)src[ii];
+                        return ret;
+                    }
+#               endif
+
+                default:
+                    throw CreateDmlException("Cannot retrieve this array as a floating-point type.");
+            }
+        }
+
+        public double[] GetArrayAsDouble()
+        {
+            double[] ret;
+            switch (ArrayType)
+            {
+                case ArrayTypes.U8:
+                    {
+                        byte[] src = GetByteArray();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U16:
+                    {
+                        UInt16[] src = GetUInt16Array();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U24:
+                    {
+                        UInt32[] src = GetUInt24Array();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U32:
+                    {
+                        UInt32[] src = GetUInt32Array();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.U64:
+                    {
+                        UInt64[] src = GetUInt64Array();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I8:
+                    {
+                        sbyte[] src = GetSByteArray();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I16:
+                    {
+                        Int16[] src = GetInt16Array();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I24:
+                    {
+                        Int32[] src = GetInt24Array();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I32:
+                    {
+                        Int32[] src = GetInt32Array();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.I64:
+                    {
+                        Int64[] src = GetInt64Array();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.Singles:
+                    {
+                        float[] src = GetSingleArray();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = src[ii];
+                        return ret;
+                    }
+
+                case ArrayTypes.Doubles: return GetDoubleArray();
+
+#               if false
+                case ArrayTypes.Decimals:
+                    {
+                        decimal[] src = GetDecimalArray();
+                        ret = new double[src.Length];
+                        for (int ii = 0; ii < src.Length; ii++) ret[ii] = (double)src[ii];
+                        return ret;
+                    }
+#               endif
+
+                default:
+                    throw CreateDmlException("Cannot retrieve this array as an floating-point type.");
+            }
+        }
+
+        #endregion
+
+        #endregion
+
+        #region "DML-EC (Encrypted/Compressed) Readers"
+        
+        /// <summary>
+        /// EncMessageStream parses the "Encrypted Message" format utilized in DML-EC's encrypted
+        /// nodes.  It manages the block count values and following blocks and provides them to
+        /// a reader, which would normally be a decryptor.
+        /// </summary>
+        private class EncMessageStream : Stream
+        {
+            public Stream BaseStream;
+            private EndianBinaryReader Reader;
+            private UInt64 BlockCount = 0;
+            private byte[] Buffer = new byte [128 / 8];
+            private int Used = int.MaxValue;
+            private bool EOS = false;
+
+            public EncMessageStream(Stream BaseStream)
+            {
+                this.BaseStream = BaseStream;
+                this.Reader = new EndianBinaryReader(BaseStream, false);                
+            }
+
+            public override bool CanRead { get { return BaseStream.CanRead; } }
+            public override bool CanWrite { get { return false; } }
+            public override bool CanSeek { get { return false; } }
+            public override bool CanTimeout { get { return BaseStream.CanTimeout; } }
+
+            public override long Length { get { throw new NotSupportedException(); } }
+            public override long Position
+            {
+                get { throw new NotSupportedException(); }
+                set { throw new NotImplementedException(); }
+            }
+            public override long Seek(long offset, SeekOrigin origin) { throw new NotSupportedException(); }
+            public override void SetLength(long value) { throw new NotSupportedException(); }
+            public override void Write(byte[] buffer, int offset, int count) { throw new NotSupportedException(); }
+
+            public override void Close()
+            {
+                BaseStream = null;
+                Reader = null;
+            }
+
+            public override void Flush()
+            {
+                if (BaseStream == null) throw new Exception("Stream already closed.");
+                BaseStream.Flush();
+            }
+
+            private bool ReadNext()
+            {
+                if (BaseStream == null) throw new Exception("Stream already closed.");
+                if (EOS) return false;          // End of message previously reached.
+                if (BlockCount == 0)
+                {
+                    BlockCount = Reader.ReadCompact64();
+                    if (BlockCount == 0)
+                    {
+                        EOS = true;
+                        return false;           // End of message reached.
+                    }
+                }
+                BlockCount--;
+                BaseStream.Read(Buffer, 0, Buffer.Length);
+                Used = 0;
+                return true;
+            }
+
+            public void SkipAll()
+            {
+                if (BaseStream == null) throw new Exception("Stream already closed.");
+                if (EOS) return;              // End of message previously reached.
+                for (;;)
+                {
+                    if (BlockCount > 0) DmlReader.DiscardBytes(this, BlockCount * (ulong)Buffer.Length);
+                    BlockCount = Reader.ReadCompact64();
+                    if (BlockCount == 0)
+                    {
+                        EOS = true;
+                        return;
+                    }
+                }
+            }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                int Avail = Buffer.Length - Used;
+                if (Avail >= count)
+                {
+                    // There is enough data in the current Buffer to fulfill the request...
+                    for (int ii = 0; ii < count; ii++) buffer[offset++] = Buffer[Used++];
+                    return count;
+                }
+                // There is not enough data in the current Buffer to fulfill the request.
+                for (int ii = 0; ii < Avail; ii++) buffer[offset++] = Buffer[Used++];
+                int ret = Avail;                
+                // At this point, Used is guaranteed to be equal to Buffer.Length - which is to say
+                // that there is no buffered data.
+                for (;;)
+                {
+                    int Needed = count - ret;
+                    if (Needed <= Buffer.Length)
+                    {
+                        // This will be the last block.
+                        if (!ReadNext()) return ret;            // We fell just short.
+                        for (int ii = 0; ii < Needed; ii++) buffer[offset++] = Buffer[Used++];
+                        ret += Buffer.Length;
+                        return ret;                             // Mission accomplished.
+                    }
+
+                    if (!ReadNext()) return ret;                // There wasn't enough.
+                    for (Used = 0; Used < Buffer.Length; Used++) buffer[offset++] = Buffer[Used];
+                    ret += Buffer.Length;
+                }
+            }
+
+            public override int ReadByte()
+            {
+                if (Used >= Buffer.Length)
+                    if (!ReadNext()) return -1;
+                return Buffer[Used++];
+            }            
+        }
+
+        StreamWithHash ValidationStream;
+
+        /// <summary>
+        /// The ReadToEnd() is called in order to force the entire remaining stream to be
+        /// read.  If the user has already retrieved the entire stream, this function has 
+        /// no effect.
+        /// </summary>
+        private void ReadToEnd(Stream str)
+        {
+            byte[] tmp = new byte[4090];
+            for (; ; )
+            {
+                int nBytesRead = str.Read(tmp, 0, tmp.Length);
+                if (nBytesRead < tmp.Length) return;
+            }
+        }
+
+        /// <summary>
+        /// GetEncryptedDml() retrieves a DmlReader providing the decrypted form an EncryptedDml primitive node.  A Key
+        /// must be provided for decryption.
+        /// </summary>
+        /// <seealso>ValidateEncryptedDml()</seealso>
+        /// <param name="Key">Key to be used for decryption.  Must match the key that was used for encryption.</param>
+        /// <returns>DmlReader providing access to the decrypted DML fragment.  Only valid until the next Read() or
+        /// ValidateEncryptedDml() call.</returns>
+        public DmlReader GetEncryptedDml(byte[] Key)
+        {
+            if (OutstandingStream != null) throw CreateDmlException("Content already read, cannot repeat Get..() operations on the same node.");
+            if (PrimitiveType != PrimitiveTypes.EncryptedDML) throw CreateDmlException("Attempt to retrieve a decrypted representation of a node which is not encrypted.");
+            if (Key == null) throw new NotSupportedException("Cannot retrieve decrypted fragment until key is provided.");
+
+            byte[] InitializationVector = Reader.ReadByte(128 / 8);
+
+            RijndaelManaged AES = new RijndaelManaged();
+            AES.Padding = PaddingMode.ISO10126;
+            AES.Mode = CipherMode.CBC;
+            ICryptoTransform Transform = AES.CreateDecryptor(Key, InitializationVector);            
+
+            // Now positioned at the start of the payload, ready to read content...            
+            OutstandingStream = new EncMessageStream(Reader.BaseStream);
+            // We intentionally avoid setting Association = null so that SkipEncryptedDml() will be called if the user
+            // calls Read() again - giving us a chance to close out the node properly.
+            CryptoStream Decryptor = new CryptoStream(OutstandingStream, Transform, CryptoStreamMode.Read);
+
+            if (ID == EC2Translation.idEncrypted) ValidationStream = null;
+            else if (ID == EC2Translation.idAuthenticEncrypted) ValidationStream = new StreamWithHash(Decryptor, new HMACSHA384(Key));
+            else throw new NotSupportedException("Expected encrypted node to be of recognized EC2 types.");
+
+            // GetContext() creates a shallow copy of the immediate container, but no higher.
+            // The OutOfBand marker will prevent any changes from propagating up the ladder.
+            DmlContext Context = Container.ShallowCopy();
+            Context.OutOfBand = true;
+            Context.StartPosition = 0L;
+
+            return DmlReader.Create((ValidationStream == null) ? (Stream)Decryptor : (Stream)ValidationStream, Options, Context);
+        }
+
+        /// <summary>
+        /// ValidateEncryptedDml() can be called after GetEncryptedDml().  The decrypted DmlReader becomes invalid 
+        /// after the ValidateEncryptedDml() call, so retrieval from the DmlReader must be completed before
+        /// validation.
+        /// </summary>        
+        /// <returns>True if validation was performed successfully.  False if no validation information is available
+        /// in the DML stream.  An exception is thrown if validation is available but failed.</returns>
+        public bool ValidateEncryptedDml()
+        {
+            if (PrimitiveType != PrimitiveTypes.EncryptedDML) throw CreateDmlException("Attempt to retrieve decrypted validation of a node which is not encrypted.");
+            if (OutstandingStream == null) throw CreateDmlException("GetEncryptedDml() must be called before ValidateEncryptedDml().");                        
+            if (ValidationStream == null) return false;           // No validation information with this node.
+            if (ValidationStream.IsClosed) throw CreateDmlException("Reader closed before validation.");
+            ValidationStream.ReadAll();
+            byte[] CalculatedHMAC = ValidationStream.Hash;
+            
+            byte[] ReceivedHMAC = Reader.ReadByte(384 / 8);
+
+            ValidationStream.Dispose();
+            ValidationStream = null;
+            OutstandingStream.Dispose();
+            OutstandingStream = null;
+            Association = null;            
+            
+            if (ReceivedHMAC.Length != CalculatedHMAC.Length)
+                throw CreateDmlException("Validation of decrypted data failed - mistmatch in HMAC sizes.");
+            for (int ii = 0; ii < ReceivedHMAC.Length; ii++)
+            {
+                if (ReceivedHMAC[ii] != CalculatedHMAC[ii]) throw CreateDmlException("Validation of decrypted data failed.");
+            }
+            return true;                        
+        }        
+
+        private void SkipEncryptedDml()
+        {
+            /** There are several possible sequences for encrypted nodes:
+             *      Neither GetEncryptedDml() nor ValidateEncryptedDml() called:  SkipEncryptedDmlDml() is intended to skip.
+             *      GetEncryptedDml() called but not ValidateEncrpytedDml():  SkipEncryptedDmlDml() must close off the get operation.
+             *      GetEncryptedDml() and ValidateEncryptedDml() called:  SkipEncryptedDmlDml() will not be called in this case.
+             */
+
+            if (OutstandingStream != null)
+            {
+                // OutstandingStream is non-null, so GetEncryptedDml() was called.                
+
+                if (ValidationStream != null)
+                {
+                    ValidationStream.Dispose();
+                    ValidationStream = null;
+                }
+
+                EncMessageStream EncMessage = OutstandingStream as EncMessageStream;
+                if (EncMessage == null) throw CreateDmlException("Mismatched stream types at encrypted node closure.");
+                EncMessage.SkipAll();                
+                OutstandingStream.Dispose();
+                OutstandingStream = null;
+            }
+            else
+            {
+                // OutstandingStream is null and if we got here, Association is non-null, so
+                // neither GetEncryptedDml() nor ValidateEncryptedDml() has been called.
+
+                DiscardBytes(128 / 8);                      // Discard Initialization Vector
+
+                EncMessageStream EncMessage = new EncMessageStream(Reader.BaseStream);
+                EncMessage.SkipAll();
+            }
+            if (ID == EC2Translation.idAuthenticEncrypted) DiscardBytes(384 / 8);     // Discard the HMAC-SHA384 code.
+            Association = null;
+        }
+
+        /// <summary>
+        /// GetCompressedDml() retrieves a DmlReader providing the decompressed form of a CompressedDml primitive node.  
+        /// </summary>
+        /// <seealso>ValidateCompressedDml()</seealso>        
+        /// <returns>DmlReader providing access to the decompressed DML fragment.  Only valid until the next Read() or
+        /// ValidateCompressedDml() call.</returns>
+        public DmlReader GetCompressedDml()
+        {
+            if (OutstandingStream != null) throw CreateDmlException("Content already read, cannot repeat Get..() operations on the same node.");
+            if (PrimitiveType != PrimitiveTypes.CompressedDML) throw CreateDmlException("Attempt to retrieve a decompressed representation of a node which is not compressed.");
+
+            // Now positioned at the start of the payload, ready to read content...            
+            //OutstandingStream = new DeflateStream(Reader.BaseStream, CompressionMode.Decompress);            
+            OutstandingStream = new DeflateStreamEx(Reader.BaseStream);
+            // We intentionally avoid setting Association = null so that SkipCompressedDml() will be called if the user
+            // calls Read() again - giving us a chance to close out the node properly.            
+
+            if (ID == EC2Translation.idVerifiedCompressed) ValidationStream = new StreamWithHash(OutstandingStream, CRC32.CreateCastagnoli());
+
+            // GetContext() creates a shallow copy of the immediate container, but no higher.
+            // The OutOfBand marker will prevent any changes from propagating up the ladder.
+            DmlContext Context = Container.ShallowCopy();
+            Context.OutOfBand = true;
+            Context.StartPosition = 0L;
+
+            return DmlReader.Create((ValidationStream == null) ? OutstandingStream : ValidationStream, Options, Context);            
+        }
+
+        /// <summary>
+        /// ValidateCompressedDml() can be called after GetCompressedDml().  The decompressed DmlReader becomes invalid 
+        /// after the ValidateCompressedDml() call, so retrieval from the DmlReader must be completed before
+        /// validation.
+        /// </summary>        
+        /// <returns>True if validation was performed successfully.  False if no validation information is available
+        /// in the DML stream.  An exception is thrown if validation is available but failed.</returns>
+        public bool ValidateCompressedDml()
+        {
+            if (PrimitiveType != PrimitiveTypes.CompressedDML) throw CreateDmlException("Attempt to retrieve decompressed validation of a node which is not compressed.");
+            if (OutstandingStream == null) throw CreateDmlException("GetCompressedDml() must be called before ValidateCompressedDml().");            
+            if (ValidationStream == null) return false;           // No validation information with this node.
+            if (ValidationStream.IsClosed)
+                throw CreateDmlException("Reader closed before validation.");
+            ValidationStream.ReadAll();
+            byte[] Hash = ValidationStream.Hash;
+            if (Hash.Length != 4) throw CreateDmlException("Expected 32-bit hash result from compressed operations.");
+            uint CalculatedCRC32 = BitConverter.ToUInt32(Hash, 0);
+
+            Reader.LittleEndian = false;
+            uint ReceivedCRC32 = Reader.ReadUInt32();
+
+            ValidationStream.Dispose();
+            ValidationStream = null;
+            OutstandingStream.Dispose();
+            OutstandingStream = null;            
+            Association = null;
+
+            if (ReceivedCRC32 == CalculatedCRC32) return true;
+            else throw CreateDmlException("Validation of decompressed data failed.");
+        }
+
+        private void SkipCompressedDml()
+        {
+            /** There are several possible sequences for encrypted nodes:
+             *      Neither GetEncryptedDml() nor ValidateEncryptedDml() called:  SkipEncryptedDmlDml() is intended to skip.
+             *      GetEncryptedDml() called but not ValidateEncyrptedDml():  SkipEncryptedDmlDml() must close off the get operation.
+             *      GetEncryptedDml() and ValidateEncryptedDml() called:  SkipEncryptedDmlDml() will not be called in this case.
+             */
+
+            // Unlike an encrypted node, a compressed node does not have a length which is given
+            // up-front.  The compression algorithm places a 3-bit header at the start of the block
+            // which must be examined to locate the last block of the compressed stream.  Most
+            // blocks do not identify a length up-front either and the block must be decompressed
+            // to locate the end-of-block marker.  It might be useful to consider a compression
+            // algorithm that provides a block length for faster 'skipping' operation, however
+            // containers are also capable of providing the overall length.
+
+            if (OutstandingStream == null) GetCompressedDml();
+
+            if (ValidationStream != null)
+            {
+                ValidationStream.Dispose();
+                ValidationStream = null;
+            }
+            
+            ReadToEnd(OutstandingStream);
+            OutstandingStream.Dispose();
+            OutstandingStream = null;
+
+            if (ID == EC2Translation.idVerifiedCompressed) DiscardBytes(4);     // Discard the CRC32 code.
+            Association = null;
+        }
+
+        #endregion
+
+        #region "Navigation"
+
+        /// <summary>
+        /// CanSeek checks whether the underlying stream is capable of seeking.  If the stream can seek,
+        /// the MoveOutOfContainer() operation is fast and the GetContext() and Seek...() methods are
+        /// available.  If the stream cannot seek, the MoveOutOfContainer() operation is slower and the
+        /// GetContext() and Seek...() methods will result in an exception.
+        /// </summary>
+        public bool CanSeek { get { return Reader.BaseStream.CanSeek; } }
+
+        /// <summary>
+        /// MoveOutOfContainer() permits the caller to navigate the reader out of the present container.
+        /// This operation can be time consuming for large containers, and it is often preferable to
+        /// design the DML file format such that seeking is practical.
+        /// </summary>
+        /// <seealso>Container.IsSizeKnown</seealso>
+        public void MoveOutOfContainer()
+        {            
+            // We can parse until we see the end container marker.  We may also see sub-containers
+            // within this one, so we have to keep track of what container it is we intend to close.
+            DmlContext ToFinish = Container;
+            while (Read())
+            {
+                if (NodeType == NodeTypes.EndContainer && Container == ToFinish) return;
+            }
+        }
+
+        /// <summary>
+        /// GetContext() is used with seekable streams in order to navigate.  The returned DmlContext
+        /// can be used to return to the current read position, but can also be used in order to
+        /// seek to a new position within the same container.  In order to seek in a DML tree, the 
+        /// DmlReader must know what context the stream will have at the new position.  Context 
+        /// identifies the current container and all higher-level containers in the tree.
+        /// </summary>
+        /// <returns>A DmlContext which can be used with the Seek..() methods.</returns>
+        public DmlContext GetContext() {
+            FinishNode();
+            DmlContext ret = Container.ShallowCopy();
+            ret.ContextPosition = Reader.BaseStream.Position;
+            return ret;
+        }
+
+        /// <summary>
+        /// The Seek() method returns to a context retrieved by a GetContext() 
+        /// call.  The Seek..() methods require a seekable stream.
+        /// </summary>
+        /// <param name="Context">Context to return to.</param>
+        public void Seek(DmlContext Context)
+        {
+            if (Context.ContextPosition == long.MaxValue)
+                SeekAbsolute(Context, (UInt64)Context.StartPosition);
+            else
+                SeekAbsolute(Context, (UInt64)Context.ContextPosition);
+        }
+
+        /// <summary>
+        /// The SeekAbsolute() method repositions the DmlReader to the given
+        /// Position relative to the beginning of the stream.  The Seek..()
+        /// methods require a seekable stream.  The position must be part of 
+        /// the container belonging to the Context.  That is, the seek must be 
+        /// within the same container as the one when the GetContext() call was made.        
+        /// </summary>
+        /// <param name="Context">Context retrieved by GetContext() while reading
+        /// the container covering the position to seek to.</param>
+        /// <param name="Position">Position to seek to, from beginning of stream.</param>
+        public void SeekAbsolute(DmlContext Context, UInt64 Position)
+        {
+            FinishNode();           // Clear out the current Association so it does not linger at the new location.
+            Reader.BaseStream.Seek((long)Position, SeekOrigin.Begin);
+            m_Container = Context;
+        }
+
+        /// <summary>
+        /// The SeekRelative() method repositions the DmlReader to the given
+        /// Offset relative to the Context position.  The Seek..() methods require
+        /// a seekable stream.  The position must be within the same container as that
+        /// belonging to the Context.  
+        /// </summary>
+        /// <seealso>GetRelativePosition().</seealso>
+        /// <param name="Context">Context retrieved by GetContext() while reading
+        /// the container covering the position to seek to.</param>
+        /// <param name="Offset">Offset relative to the location where the Context
+        /// was retrieved.</param>
+        public void SeekRelative(DmlContext Context, UInt64 Offset)
+        {
+            SeekAbsolute(Context, (UInt64)Context.ContextPosition + Offset);
+        }        
+        
+        /// <summary>
+        /// SeekOutOfBand() can be used with seekable streams where data is contained
+        /// beyond the end of the top-level container.  This data is out-of-band data
+        /// because it is not part of the top-level container, which conceptually 
+        /// includes all data in the DML stream.  Data is sometimes written "out-of-band"
+        /// in order to make it easy to append data.  The seek occurs under the
+        /// assumption that the out-of-band data belongs to the current DmlContext.
+        /// That is, the data behaves as if it is part of the current container and tree.
+        /// After the out-of-band data is read, Seek(Context) should be used to return
+        /// to the previous location before sequential parsing can continue.
+        /// </summary>
+        /// <seealso>DmlWriter.WriteReservedSpace()</seealso>        
+        /// <param name="Position">Position to seek, from beginning of stream.</param>
+        /// <returns>The current context which can be used to return to the current
+        /// location after the out-of-band data has been read.</returns>
+        public DmlContext SeekOutOfBand(UInt64 Position)
+        {
+            FinishNode();           // Clear out the current Association so it does not linger at the new location.
+            DmlContext ret = GetContext();
+            Reader.BaseStream.Seek((long)Position, SeekOrigin.Begin);
+
+            DmlContext NewContext = Container.ShallowCopy();
+            NewContext.OutOfBand = true;
+            m_Container = NewContext;
+            return ret;
+        }
+
+        #endregion                
+
+        #region "Low-Level Reading Utilities"
+
+        protected Association ReadIdentificationInformation()
+        {       
+            try
+            {
+                int NameLen = (int)Reader.ReadCompact32();
+                byte[] RawName = new byte [NameLen];
+                Reader.Read(RawName, 0, NameLen);
+                string Name = Encoding.UTF8.GetString(RawName);
+
+                int TypeLen = (int)Reader.ReadCompact32();
+                byte[] RawType = new byte[TypeLen];
+                Reader.Read(RawType, 0, TypeLen);
+                string Type = Encoding.UTF8.GetString(RawType);
+
+                if (Type.ToLowerInvariant() == "container")
+                {
+                    return new Association(DmlTranslation.DML3.InlineIdentification.DMLID, new DmlName(Name, NodeTypes.Container));
+                }
+                else
+                {
+                    PrimitiveTypes PrimitiveType; ArrayTypes ArrayType;
+                    if (!DmlInternalData.StringToPrimitiveType(Type, out PrimitiveType, out ArrayType))
+                    {
+                        foreach (IDmlReaderExtension Ext in Options.Extensions)
+                        {
+                            uint TypeId = Ext.Identify(Type);
+                            if (TypeId != 0)
+                                return new Association(DmlTranslation.DML3.InlineIdentification.DMLID, new DmlName(Name, Ext, TypeId));
+                        }
+                        throw CreateDmlException("Dml type not recognized internally or by any registered extensions.");
+                    }
+                    return new Association(DmlTranslation.DML3.InlineIdentification.DMLID, new DmlName(Name, PrimitiveType, ArrayType));
+                }
+            }
+            catch (Exception ex) { throw CreateDmlException(ex.Message, ex); }                
+        }        
+
+        protected static void DiscardBytes(Stream OnStream, UInt64 NBytes)
+        {
+            if (OnStream.CanSeek) OnStream.Seek((long)NBytes, SeekOrigin.Current);
+            else
+            {
+                byte[] trash = new byte [4090];
+                while (NBytes > 0)
+                {
+                    int nToRead = 4090;
+                    if (NBytes < (UInt64)nToRead) nToRead = (int)NBytes;                    
+                    int nRead = OnStream.Read(trash, 0, nToRead);
+                    if (nRead < nToRead) throw new EndOfStreamException();
+                    NBytes -= (ulong)nRead;
+                }
+            }
+        }
+
+        protected void DiscardBytes(UInt64 NBytes) { DiscardBytes(Reader.BaseStream, NBytes); }        
+
+        #endregion
+
+        #region "Error Management"
+        
+        internal DmlException CreateDmlException(string Message) { return CreateDmlException(Message, null); }
+        internal DmlException CreateDmlException(string Message, Exception innerException) { return new DmlException(Message + "\n" + GetErrorContext(), innerException); }
+
+        private string GetErrorContext()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("Dml Exception Context:");
+
+            if (Association != null && Association.DMLName != null)
+            {
+                if (NodeType != NodeTypes.Container)
+                {
+                    // On the opening of a Container, the Association is the same as the Container, so avoid
+                    // duplicate presentation...
+                    if (Association != null) sb.AppendLine("\t" + AssociationToErrorString(Association, IsAttribute));
+                }
+            }
+            DmlContext Cont = Container;
+            while (Cont != null)
+            {
+                if (Cont.Association != null) sb.AppendLine("\t" + AssociationToErrorString(Cont.Association, false));
+                else sb.AppendLine("\t(Missing association)");
+                Cont = Cont.Container;
+            }
+
+            return sb.ToString();
+        }
+
+        private static string AssociationToErrorString(Association Assoc, bool IsAttribute)
+        {            
+            string Ident;
+
+            if (Assoc.DMLID != UInt32.MaxValue && Assoc.DMLID != DML3Translation.idInlineIdentification)
+                Ident = "[" + Assoc.DMLID.ToString("X") + "] ";
+            else
+                Ident = "";
+
+            if (Assoc.DMLName.XmlName != null)
+            {
+                string XmlName = Assoc.DMLName.XmlName;
+                switch (Assoc.DMLName.NodeType)
+                {                        
+                    case NodeTypes.Comment: Ident = Ident + "(Comment) "; break;
+                    case NodeTypes.Primitive: 
+                        if (IsAttribute)
+                            Ident = Ident + XmlName + "= "; 
+                        else
+                            Ident = Ident + "<" + XmlName + "> "; 
+                        break;
+                    case NodeTypes.Container: Ident = Ident + "<" + XmlName + "> "; break;
+                    case NodeTypes.EndContainer: Ident = Ident + "</" + XmlName + "> "; break;
+                    case NodeTypes.Unknown: Ident = Ident + XmlName + " (Unknown Type) "; break;
+                }
+            }
+            else
+            {
+                switch (Assoc.DMLName.NodeType)
+                {
+                    case NodeTypes.Comment: Ident = Ident + "(Comment) "; break;
+                    case NodeTypes.Primitive: 
+                        if (IsAttribute)
+                            Ident = Ident + "(Attribute) ";
+                        else 
+                            Ident = Ident + "(Primitive) "; 
+                        break;
+                    case NodeTypes.Container: Ident = Ident + "(Container) "; break;
+                    case NodeTypes.EndContainer: Ident = Ident + "(End Container) "; break;
+                    case NodeTypes.Unknown: break;
+                }
+            }            
+            
+            return Ident;            
+        }
+
+        #endregion
+
+        #region "High-level Header Parsing Utilities"
+
+        private Association BuildNewAssociation(UInt32 NewID, string NewName, string NewType)
+        {
+            PrimitiveTypes PT;
+            ArrayTypes AT;
+            if (DmlInternalData.StringToPrimitiveType(NewType, out PT, out AT))
+                return new Association(NewID, NewName, PT, AT);
+            // Might be an extended type.  We'll need to ask the extended codecs to try and identify it.
+            foreach (IDmlReaderExtension Ext in Options.Extensions)
+            {
+                if (Ext.Identify(NewType) != 0)
+                    return new Association(NewID, NewName, PrimitiveTypes.Extension);
+            }
+            throw CreateDmlException("Unrecognized primitive type '" + NewType + "' requested.");
+        }
+
+        private void ParseXmlTranslation(DmlTranslation Into, XmlReader Reader, IResourceResolution Resources = null)
+        {
+            while (Reader.Read())
+            {
+                if (Reader.NodeType == XmlNodeType.EndElement) return;
+                if (Reader.NodeType != XmlNodeType.Element) continue;
+
+                switch (Reader.Name.ToLower())
+                {
+                    case "node":
+                        {
+                            UInt32 NewID = UInt32.Parse(Reader.GetAttribute("id"));
+                            string NewName = Reader.GetAttribute("name");
+                            string NewType = Reader.GetAttribute("type");
+                            Into.Add(BuildNewAssociation(NewID, NewName, NewType));
+                            continue;
+                        }
+
+                    case "container":
+                        {
+                            UInt32 NewID = UInt32.Parse(Reader.GetAttribute("id"));
+                            string NewName = Reader.GetAttribute("name");                        
+                            DmlTranslation NewTranslation = null;
+                            if (!Reader.IsEmptyElement)
+                            {
+                                NewTranslation = new DmlTranslation(Into);
+                                ParseXmlTranslation(NewTranslation, Reader, Resources);
+                            }
+                            Into.Add(new Association(NewID, NewName, NewTranslation));
+                            continue;
+                        }
+
+                    case "xmlroot":
+                        {
+                            // Discard.
+                            if (!Reader.IsEmptyElement)
+                            {
+                                int nested = 1;
+                                while (Reader.Read())
+                                {
+                                    if (Reader.NodeType == XmlNodeType.EndElement) nested--;
+                                    if (Reader.NodeType == XmlNodeType.Element && !Reader.IsEmptyElement) nested++;
+                                    if (nested == 0) break;
+                                }
+                            }
+                            continue;
+                        }
+
+                    case "dml:include-translation":
+                    case "include-translation":
+                        {
+                            string NewTranslationURN = Reader.GetAttribute("URN");
+                            string NewTranslationURI = Reader.GetAttribute("URI");
+                            if (NewTranslationURI != null)
+                                ParseTranslation(Into, NewTranslationURI, NewTranslationURN, Resources);
+                            
+                            continue;
+                        }
+
+                    case "dml:include-primitives":
+                    case "include-primitives":
+                        {                                                        
+                            string NewPrimitives = Reader.GetAttribute("Set");
+                            if (NewPrimitives != null)
+                            {
+                                string Codec = Reader.GetAttribute("Codec");
+                                AddPrimitiveSet(new PrimitiveSet(NewPrimitives, Codec, Reader.GetAttribute("CodecURI")));
+
+                                if (!Reader.IsEmptyElement) ConfigurePrimitiveSet(NewPrimitives, Codec, Reader);
+                            }
+
+                            continue;
+                        }
+
+                    case "renumber":
+                        {
+                            Into.Renumber(UInt32.Parse(Reader.GetAttribute("id")), UInt32.Parse(Reader.GetAttribute("new-id")));
+                            continue;
+                        }
+
+                    default: throw new FormatException("Unexpected node '" + Reader.Name + "' in DML Translation document.");
+                }
+            }
+        }
+
+        private void ParseXmlTranslation(DmlTranslation Into, Stream Stream, string TranslationURN, IResourceResolution Resources = null)
+        {
+            // Setup an XmlParserContext so that we can pre-define the DML namespace...            
+            NameTable nt = new NameTable();
+            XmlNamespaceManager nsmgr = new XmlNamespaceManager(nt);
+            nsmgr.AddNamespace("DML", "urn:dml:dml3");
+            XmlParserContext context = new XmlParserContext(null, nsmgr, null, XmlSpace.None);
+
+            // Set XmlReaderSettings so that multiple top-level elements are allowed (permits an optional DML:Header)...
+            XmlReaderSettings xrs = new XmlReaderSettings();
+            xrs.ConformanceLevel = ConformanceLevel.Fragment;   // Permit multiple top-level elements (for DML:Header).
+
+            using (XmlReader Reader = XmlReader.Create(Stream, xrs, context))
+            {
+                // Find translation document top-level container            
+                for (; ; )
+                {
+                    if (!Reader.Read()) throw new FormatException("Expected DML:Translation element.");
+                    if (Reader.NodeType != XmlNodeType.Element) continue;                    
+                    if (Reader.Name == "DML:Translation" || Reader.Name == "Translation")
+                    {
+                        if (Reader.IsEmptyElement) return;              // No content in the Translation.
+
+                        // Parse translation document body
+                        ParseXmlTranslation(Into, Reader, Resources);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Precondition: We must have already parsed the EndAttributes marker of the DML:Header or DML:Translation tag
+        // and be ready to process the container.
+        // Postcondition: Will have processed the EndContainer marker before returning.
+        private void ParseDmlTranslation(DmlTranslation Into, DmlReader Reader, IResourceResolution Resources = null)
+        {
+            // Parse translation document body            
+            for (; ; )
+            {
+                if (!Reader.Read()) throw Reader.CreateDmlException("Unterminated container.");
+
+                switch (Reader.NodeType)
+                {
+                    case NodeTypes.EndContainer: return;
+                    case NodeTypes.Comment: continue;
+                    case NodeTypes.Padding: continue;
+                    case NodeTypes.Container:
+                        {
+                            /** Parse XMLRoot element if found **/
+
+                            if (Reader.ID == TSL2Translation.idXMLRoot)
+                            {
+                                // Skip over the XMLRoot element.
+                                for (; ; )
+                                {
+                                    if (!Reader.Read()) throw Reader.CreateDmlException("Unterminated XMLRoot container in translation document.");
+                                    if (Reader.NodeType == NodeTypes.EndContainer) break;
+                                }
+                                continue;
+                            }
+
+                            /** Parse DML:Include-Translation container if found **/
+
+                            if (Reader.ID == TSL2Translation.idDMLIncludeTranslation)
+                            {
+                                string NewTranslationURI = null;                                
+                                string NewTranslationURN = null;
+
+                                for (; ; )
+                                {
+                                    if (!Reader.Read()) throw Reader.CreateDmlException("Unterminated DML:Include-Translation directive in translation document.");
+
+                                    switch (Reader.NodeType)
+                                    {
+                                        case NodeTypes.Comment: continue;
+                                        case NodeTypes.Padding: continue;
+                                        case NodeTypes.EndContainer: break;
+                                        case NodeTypes.EndAttributes: continue;
+                                        case NodeTypes.Primitive:
+                                            switch (Reader.ID)
+                                            {
+                                                case TSL2Translation.idDML_URI: NewTranslationURI = Reader.GetString(); break;
+                                                case TSL2Translation.idDML_URN: NewTranslationURN = Reader.GetString(); break;                                                
+                                                default:
+                                                    throw Reader.CreateDmlException("Unrecognized primitive when parsing DML:Include-Translation directive in translation document.");
+                                            }
+                                            continue;
+                                        default:
+                                            throw Reader.CreateDmlException("Unexpected node type when parsing DML:Include-Translation directive in translation document.");
+                                    }
+                                    break;
+                                }
+
+                                if (NewTranslationURI != null || NewTranslationURN != null)
+                                    ParseTranslation(Into, NewTranslationURI, NewTranslationURN, Resources);
+
+                                continue;
+                            }
+
+                            /** Parse DML:Include-Primitives container if found **/
+
+                            if (Reader.ID == TSL2Translation.idDMLIncludePrimitives)
+                            {
+                                string NewPrimitives = null;
+                                string NewCodec = null;
+                                string NewCodecURI = null;
+
+                                for (; ; )
+                                {
+                                    if (!Reader.Read()) throw Reader.CreateDmlException("Unterminated DML:Include-Primitives directive in translation document.");
+
+                                    switch (Reader.NodeType)
+                                    {
+                                        case NodeTypes.Comment: continue;
+                                        case NodeTypes.Padding: continue;
+                                        case NodeTypes.EndContainer:
+                                            if (NewPrimitives == null) throw Reader.CreateDmlException("Invalid DML:Include-Primitives directive in translation document.");
+                                            AddPrimitiveSet(NewPrimitives, NewCodec);
+                                            break;
+                                        case NodeTypes.EndAttributes: 
+                                            if (NewPrimitives == null) throw Reader.CreateDmlException("Invalid DML:Include-Primitives directive in translation document.");
+                                            AddPrimitiveSet(NewPrimitives, NewCodec);
+                                            ConfigurePrimitiveSet(NewPrimitives, NewCodec, Reader);
+                                            break;
+                                        case NodeTypes.Primitive:
+                                            switch (Reader.ID)
+                                            {
+                                                case TSL2Translation.idDMLSet: NewPrimitives = Reader.GetString(); break;
+                                                case TSL2Translation.idDMLCodec: NewCodec = Reader.GetString(); break;
+                                                case TSL2Translation.idDMLCodecURI: NewCodecURI = Reader.GetString(); break;
+                                                default:
+                                                    throw Reader.CreateDmlException("Unrecognized primitive when parsing DML:Include-Primitives directive in translation document.");
+                                            }
+                                            continue;
+                                        default:
+                                            throw Reader.CreateDmlException("Unexpected node type when parsing DML:Include-Primitives directive in translation document.");
+                                    }
+                                    break;
+                                }
+
+                                
+
+                                continue;
+                            }
+
+                            /** Parse a Node, Container, or Renumber container, possibly including local(s) translation **/
+
+                            string NewName = null;
+                            UInt32 NewID = 0; bool GotID = false;
+                            string NewType = null;
+                            UInt32 NewToID = 0; bool GotToID = false;
+                            DmlTranslation NewTranslation = null;
+                            if (Reader.ID == TSL2Translation.idContainer) NewType = "container";
+                            
+                            for (; ; )
+                            {
+                                if (!Reader.Read()) throw Reader.CreateDmlException("Unterminated container or node declaration in translation document.");
+
+                                switch (Reader.NodeType)
+                                {
+                                    case NodeTypes.Comment: continue;
+                                    case NodeTypes.Padding: continue;
+                                    case NodeTypes.EndContainer: break;
+                                    case NodeTypes.EndAttributes:
+                                        if (NewType == "container")
+                                        {
+                                            NewTranslation = new DmlTranslation(Into);
+                                            ParseDmlTranslation(NewTranslation, Reader, Resources);     // Will parse until EndContainer is reached.
+                                            if (NewTranslation.Count == 0) NewTranslation = null;
+                                            break;          // Because ParseDmlTranslation() ran until EndContainer was reached.
+                                        }
+                                        continue;
+                                    case NodeTypes.Primitive:
+                                        switch (Reader.ID)
+                                        {
+                                            case TSL2Translation.idDMLID: NewID = (uint)Reader.GetUInt(); GotID = true; break;
+                                            case TSL2Translation.idName: NewName = Reader.GetString(); break;
+                                            case TSL2Translation.idType: NewType = Reader.GetString(); break;
+                                            case TSL2Translation.idNewID: NewToID = (uint)Reader.GetUInt(); GotToID = true; break;
+                                            default:
+                                                throw Reader.CreateDmlException("Unrecognized primitive when parsing declaration in translation document.");
+                                        }
+                                        continue;
+                                    default:
+                                        throw Reader.CreateDmlException("Unexpected node type when parsing container or node declaration in translation document.");
+                                }
+                                break;
+                            }
+
+                            /** Process the Node, Container, or Renumber directive **/
+                            
+                            if (Reader.ID == TSL2Translation.idNode || Reader.ID == TSL2Translation.idContainer)
+                            {
+                                if (!GotID || NewName == null || NewType == null)
+                                    throw Reader.CreateDmlException("Incomplete declaration in translation document.");
+
+                                if (NewType == "container") Into.Add(new Association(NewID, NewName, NewTranslation));
+                                else Into.Add(BuildNewAssociation(NewID, NewName, NewType));
+                                continue;
+                            }
+                            else if (Reader.ID == TSL2Translation.idRenumber)
+                            {
+                                if (!GotID || !GotToID)
+                                    throw Reader.CreateDmlException("Incomplete renumber directive in translation document.");
+
+                                Into.Renumber(NewID, NewToID);
+                                continue;
+                            }
+                            else throw Reader.CreateDmlException("Unrecognized directive in translation document.");
+                        }
+
+                    default:
+                        throw CreateDmlException("Unexpected or invalid node when parsing header or translation document.");
+                }
+            }
+        }
+
+        private void ParseDmlTranslation(DmlTranslation Into, Stream Stream, string TranslationURN, IResourceResolution Resources = null)
+        {
+            DmlReader Reader = DmlReader.Create(Stream);
+            Reader.ParseHeader(Resources);
+
+            // Find translation document top-level container            
+            for (; ; )
+            {
+                if (!Reader.Read()) throw Reader.CreateDmlException("Expected DML:Translation element.");
+                if (Reader.NodeType == NodeTypes.Padding || Reader.NodeType == NodeTypes.Comment) continue;
+                if (Reader.NodeType != NodeTypes.Container) throw Reader.CreateDmlException("Expected DML:Translation element.");
+                if (Reader.ID != TSL2Translation.idDMLTranslation) throw Reader.CreateDmlException("Expected DML:Translation document.");
+                break;
+            }
+
+            // Parse translation document attributes
+            for (; ; )
+            {
+                if (!Reader.Read()) throw Reader.CreateDmlException("Unterminated DML:Translation container.");
+                if (Reader.NodeType == NodeTypes.Padding || Reader.NodeType == NodeTypes.Comment) continue;
+                if (Reader.NodeType == NodeTypes.EndContainer) return;          // Empty container                
+                if (Reader.NodeType == NodeTypes.EndAttributes) break;
+                if (Reader.ID == TSL2Translation.idDML_URN && TranslationURN != null && TranslationURN.Length > 0)
+                {
+                    if (!Reader.GetString().Equals(TranslationURN, StringComparison.OrdinalIgnoreCase))
+                        throw Reader.CreateDmlException("DML:URN did not match the requested translation document's URN.");
+                }
+            }
+
+            // Parse translation document body
+            ParseDmlTranslation(Into, Reader, Resources);
+        }
+
+        private void ParseTranslation(DmlTranslation Into, string TranslationURI, string TranslationURN, IResourceResolution Resources = null)
+        {
+            if (TranslationURI == DmlInternalData.urnBuiltinDML)
+            {
+                Into.Add(DmlTranslation.DML3);
+                return;
+            }
+            else if (TranslationURI == WileyBlack.Dml.EC.EC2Translation.urn)
+            {
+                Into.Add(DmlTranslation.EC2.Clone());
+                return;
+            }
+            else if (TranslationURI == TSL2Translation.urn)
+            {
+                Into.Add(DmlTranslation.TSL2.Clone());
+                return;
+            }
+            else if (Resources == null) throw new Exception("Unable to retrieve DML Translation Document.");
+
+            bool IsXml;
+            using (IDisposable Resource = Resources.Resolve(TranslationURI, out IsXml))
+            {
+                if (Resource is Stream)
+                {
+                    Stream ss = (Stream)Resource;
+                    if (IsXml) ParseXmlTranslation(Into, ss, TranslationURN, Resources);
+                    else ParseDmlTranslation(Into, ss, TranslationURN, Resources);
+                }
+                else if (Resource is ResolvedTranslation)
+                {
+                    ResolvedTranslation rt = (ResolvedTranslation)Resource;
+                    Into.Add(rt.Translation);
+                    foreach (PrimitiveSet ps in rt.PrimitiveSets) AddPrimitiveSet(ps);
+                }
+                else throw new NotSupportedException("Invalid resource return type from IResourceResolution.");
+            }
+        }
+
+        /// <summary>
+        /// ParseHeader() can be used to process the Dml Header at the beginning of a document and setup the
+        /// DmlReader for parsing of the Dml Body.  This method is a quick way to setup the document for
+        /// ordinary Dml parsing, but cannot be used in all cases.  For example, the proper conversion of DML 
+        /// to XML requires the XmlRoot element, which is discarded here.  Primitive sets and the translation 
+        /// are loaded into the DmlReader but no listing is retained.  To load and retain the header, see the
+        /// DOM and DmlTranslationDocument in particular.
+        /// </summary>
+        /// <param name="Resources"></param>
+        public void ParseHeader(IResourceResolution Resources = null)
+        {
+            if (!Read() || Association.DMLID != DML3Translation.idDMLHeader) throw CreateDmlException("Expected DML Header");
+
+            // Load header attributes
+            for (;;)
+            {
+                if (!Read()) throw CreateDmlException("Unterminated DML header.");
+                
+                switch (NodeType)
+                {
+                    case NodeTypes.EndContainer: return;
+                    case NodeTypes.EndAttributes: break;
+                    case NodeTypes.Padding: continue;
+                    case NodeTypes.Comment: continue;                    
+                    case NodeTypes.Primitive:
+                        switch (ID)
+                        {
+                            case DML3Translation.idDMLDocType: continue;
+                            case DML3Translation.idDMLVersion: continue;
+                            case DML3Translation.idDMLReadVersion:
+                                {
+                                    ulong ReadV = GetUInt();
+                                    if (ReadV != DmlInternalData.DMLReadVersion) throw CreateDmlException("DML Read version " + ReadV + " is not supported by this DML parser.");
+                                    continue;
+                                }
+                            default:
+                                throw CreateDmlException("Unsupported DML attribute '" + Name + "' found in DML header.");
+                        }
+                    default: throw CreateDmlException("Unrecognized or invalid node type.");
+                }
+                break;
+            }
+
+            // Load header elements (directives)
+            
+            // Note: GlobalTranslation is created at initialization as a clone of DML3, so the DML3
+            // translation is properly pre-loaded into the top-level.
+            ParseDmlTranslation(GlobalTranslation, this, Resources);
+        }
+
+        #endregion
+    }
+
+    public class DmlContext
+    {
+        internal DmlContext m_Container;
+        internal bool OutOfBand = false;        
+
+        /// <summary>
+        /// StartPosition stores the starting position of the container data if it is available (seekable
+        /// stream).  It has the value long.MaxValue if the stream is not seekable.
+        /// </summary>
+        internal long StartPosition = long.MaxValue;
+
+        /// <summary>
+        /// ContextPosition is used only with specific navigation functions, and only on seekable streams.
+        /// </summary>
+        internal long ContextPosition = long.MaxValue;
+
+        public DmlContext ShallowCopy()
+        {
+            DmlContext cp = new DmlContext();            
+            cp.m_Container = m_Container;
+            cp.OutOfBand = OutOfBand;
+            cp.StartPosition = StartPosition;
+            cp.Association = Association;
+            cp.ContextPosition = ContextPosition;
+            return cp;
+        }
+
+        /// <summary>Provides the DML association of this container.</summary>
+        public Association Association;
+
+        /// <summary>Returns the container of this container.  Returns null if this is a top-level
+        /// entity in the DML document or fragment.</summary>
+        public DmlContext Container
+        {
+            get { return m_Container; }
+        }
+
+        /// <summary>Provides the numeric DML Identifier of the container.</summary>
+        public UInt32 ID
+        {
+            get { return Association.DMLID; }
+        }
+
+        /// <summary>Name provides the XML-Compatible name for the container.  This property is only
+        /// available when using DmlReader.</summary>
+        public string Name
+        {
+            get
+            {
+                if (Association == null) throw new Exception("This property is only available when using a DmlReader.");
+                return Association.DMLName.XmlName;
+            }
+        }
+
+        /// <summary>
+        /// For diagnostic use only.
+        /// </summary>
+        public long GetDiagnosticPosition() { return StartPosition; }
+    }
+
+    /// <summary>
+    /// The IDmlReaderExtension interface can be used to provide additional primitives and codecs
+    /// for use with DmlReader.  Provide extensions as part of the ParsingOptions provided at
+    /// DmlReader creation.
+    /// </summary>
+    public interface IDmlReaderExtension
+    {
+        /// <summary>
+        /// AddPrimitiveSet() is called when the DmlReader's AddPrimitiveSet() method cannot
+        /// recognize the primitive set name.  The AddPrimitiveSet() can return true to indicate
+        /// that the extension handles the set and codec (if provided).  The same AddPrimitiveSet()
+        /// call may be made repeatedly by the DmlReader and should continue to return true if
+        /// the set and codec are supported and handled by this extension.  If false is returned,
+        /// DmlReader checks with other registered extensions.  If none support the set, then
+        /// an exception is thrown.
+        /// </summary>
+        /// <param name="SetName">The value of the DML:Primitives attribute for the set being requested.</param>
+        /// <param name="Codec">If non-null, provides the value of the DML:Codec attribute for the set being requested.  If the
+        /// primitive set is handled by this extension but the codec is not supported, an exception should be thrown.</param>
+        /// <param name="Configuration">Can provide additional, opaque codec configuration information to the codec.</param>
+        /// <returns>True if the set and codec are recognized and supported and handled by this extension.  False otherwise.</returns>
+        bool AddPrimitiveSet(string SetName, string Codec);
+
+        /// <summary>
+        /// Configure() is called if the &lt;DML:Include-Primitives /&gt; directive includes
+        /// additional configuration information.  The XmlReader will be positioned at the
+        /// start of the configuration information, and must parse until an end element
+        /// is found.  Nested elements must be terminated as well.  An example parser
+        /// would follow this pattern:
+        /// <example>
+        /// void Configure(string SetName, string Codec, XmlReader Reader)
+        /// {
+        ///     while (Reader.Read())
+        ///     {
+        ///         if (Reader.NodeType == XmlNodeType.EndElement) return;
+        ///         if (Reader.NodeType != XmlNodeType.Element) continue;
+        ///     
+        ///         switch (Reader.Name.ToLower())
+        ///         {
+        ///             // ...
+        ///         }
+        ///     }
+        /// }
+        /// </example>
+        /// </summary>
+        void Configure(string SetName, string Codec, XmlReader Reader);
+
+        /// <summary>
+        /// Configure() is called if the &lt;DML:Include-Primitives /&gt; directive includes
+        /// additional configuration information.  The DmlReader will be positioned at the
+        /// start of the configuration information, and must parse until an end container
+        /// is found.  Nested elements must be terminated as well.  An example parser
+        /// would follow this pattern:
+        /// <example>
+        /// void Configure(string SetName, string Codec, DmlReader Reader)
+        /// {
+        ///     for (; ; )
+        ///     {
+        ///         if (!Reader.Read()) throw new NotSupportedException("Unterminated configuration directive in translation.");
+        ///         
+        ///         switch (Reader.NodeType)
+        ///         {
+        ///             case NodeTypes.Comment: continue;
+        ///             case NodeTypes.Padding: continue;
+        ///             case NodeTypes.EndContainer: return;
+        ///             case NodeTypes.Container:
+        ///                 // Completely parse the nested container(s) and use as configuration information.
+        ///             default:
+        ///                 throw new NotSupportedException("Unexpected node type when parsing codec configuration.");
+        ///         }
+        ///     }
+        /// }
+        /// </example>
+        /// </summary>        
+        void Configure(string SetName, string Codec, DmlReader Reader);
+
+        /// <summary>
+        /// Identify() is called when a new association is being constructed and no built-in
+        /// primitive type supports the type string.  If this extension supports the type, then
+        /// a non-zero value should be returned that will become the TypeId for the association.
+        /// If the type string is not supported by this extension, zero should be returned.  TypeId
+        /// must be non-zero but otherwise can be defined entirely by the extension.  TypeIds need 
+        /// not be globally unique.
+        /// </summary>
+        /// <param name="PrimitiveType">Value of the type attribute for the node.</param>
+        /// <returns>Non-zero TypeId if supported by this extension.  Zero if not supported.</returns>
+        uint Identify(string PrimitiveType);
+
+        /// <summary>
+        /// OpenNode() is called when a Read() call is made and the result is a node handled by this extension.  OpenNode()
+        /// and CloseNode() are always called for an extended primitive node, while GetNode() may not be.  The NodeInfo's
+        /// TypeId value will match the value provided by a previous Identify() call from this extension.  OpenNode() may 
+        /// provide any necessary information about the node that a caller may need in order to decide what to do with the
+        /// node.  For example, when a container node is encountered the name is parsed so that the user can decide of the
+        /// container's content is of interest.  The entire node may or may not be read to accomodate this, although it is
+        /// usually preferable to do so in GetNode().  Another example would be an image - OpenNode() might provide the
+        /// image's width, height, and bits-per-pixel but not provide the actual image until the GetNode() call.  Only a
+        /// single node will be open at a time.
+        /// </summary>
+        /// <seealso>DmlReader.GetExtension()</seealso>
+        /// <param name="NodeInfo">The node's Association info.  The type parameter may provide further identification
+        /// for the node.</param>
+        /// <param name="Reader">Reader providing access to the underlying stream.</param>
+        void OpenNode(Association NodeInfo, EndianBinaryReader Reader);
+
+        /// <summary>
+        /// GetNode() is called by the DmlReader.GetExtended() method.  It should parse and return the contents of
+        /// the current node.  The node head has already been read at the time the GetNode() call is made, but DmlReader 
+        /// does not prevent multiple calls to GetNode() on the same node (which would typically result in an error.)
+        /// </summary>
+        /// <seealso>DmlReader.GetExtended()</seealso>
+        /// <param name="NodeInfo">Identification information for the node.</param>
+        /// <param name="Reader">Reader providing access to the underlying stream.</param>
+        /// <returns>The content of the node in whatever format is suitable to represent the node's data.</returns>
+        object GetNode(Association NodeInfo, EndianBinaryReader Reader);
+
+        /// <summary>
+        /// CloseNode() is called when the user is finished with the extension node and ready to advance to the next 
+        /// node (this usually occurs in the next Read() call.)  OpenNode() and CloseNode() are always called for an 
+        /// extended primitive node, while GetNode() may or may not be called between the open and close operations.
+        /// CloseNode() must determine if the node has already been read, and is responsible for "skipping" the node
+        /// if it has not.  In some cases this may entail simply reading and discarding the node (i.e. calling
+        /// GetNode() if it has not been called.)  A more optimal approach actually skips over the node's content.
+        /// </summary>
+        /// <param name="NodeInfo">Identification information for the node.</param>
+        /// <param name="Reader">Reader providing access to the underlying stream.</param>
+        void CloseNode(Association NodeInfo, EndianBinaryReader Reader);
+    }
+}
+

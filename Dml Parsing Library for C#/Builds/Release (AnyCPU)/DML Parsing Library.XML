@@ -1,0 +1,2430 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>DML Parsing Library</name>
+    </assembly>
+    <members>
+        <member name="M:WileyBlack.Cryptography.AES.EncryptStringAES(System.String,System.String)">
+            <summary>
+            Encrypt the given string using AES.  The string can be decrypted using 
+            DecryptStringAES().  The sharedSecret parameters must match.
+            </summary>
+            <param name="plainText">The text to encrypt.</param>
+            <param name="sharedSecret">A password used to generate a key for encryption.</param>
+        </member>
+        <member name="M:WileyBlack.Cryptography.AES.DecryptStringAES(System.String,System.String)">
+            <summary>
+            Decrypt the given string.  Assumes the string was encrypted using 
+            EncryptStringAES(), using an identical sharedSecret.
+            </summary>
+            <param name="cipherText">The text to decrypt.</param>
+            <param name="sharedSecret">A password used to generate a key for decryption.</param>
+        </member>
+        <member name="M:WileyBlack.Cryptography.SignedXMLMessage.#ctor(System.String)">
+            Versions that embed the public key into the message *
+        </member>
+        <member name="M:WileyBlack.Cryptography.SignedXMLMessage.#ctor(System.String,System.Security.Cryptography.RSAParameters)">
+            Versions that require the receiver to have a priori knowledge of the public key *
+        </member>
+        <member name="M:WileyBlack.Cryptography.SignedXMLMessage.ExtractDocument">
+            <summary>
+            Extract the signed document contained inside the SignedXMLMessage.  If the authenticity of the
+            signed document does not verify, then an exception is thrown.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:WileyBlack.Cryptography.SignedXMLMessage.ExtractDocument(WileyBlack.Cryptography.RSAPublicKey)">
+            <summary>
+            Extract the signed document contained inside the SignedXMLMessage using public key known a priori.  If 
+            the authenticity of the signed document does not verify, then an exception is thrown.
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="T:WileyBlack.Dml.Dom.DmlDocument">
+            <summary>
+            DmlDocument provides the top-level of the Dml Document Object Model (DOM).  A DmlDocument
+            can be created in memory, loaded from a stream or file, and/or saved to a stream or file.  
+            The DmlDocument is itself a DmlContainer that represents the top-level Dml container in
+            any document.  The document's header, translation, and other ancillary details can be 
+            accessed through the DmlDocument's properties.  All loading processes are routed through
+            the DmlDocument's creation factories, permitting custom loading behavior in derived
+            classes.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlNode.GetEncodedSize(WileyBlack.Dml.DmlWriter)">
+            <summary>
+            GetEncodedSize() provides a prediction of the encoded size,
+            in bytes, of the node.  When the encoded size cannot be
+            predicted, UInt64.MaxValue is returned.
+            </summary>
+            <param name="Writer"></param>
+            <returns></returns>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlNode.Clone(WileyBlack.Dml.Dom.DmlDocument)">
+            <summary>
+            DmlNode's Clone() method performs a partial copy operation.
+            The internal components of the node are copied (i.e. association,
+            values, etc.)  The new object is potentially associated with
+            a new document (given by the NewDoc) parameter.  The new DmlNode
+            object is not attached to any dml tree and has no parent.
+            </summary>
+            <param name="NewDoc">Document to associate the new node with.
+            Can be the same document.</param>
+            <returns>A new DmlNode object with identical properties.</returns>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlFragment.Loaded">
+            <summary>
+            Loaded provides the current state of the node.  Nodes created in memory are always fully loaded,
+            but nodes initialized from a LoadPartial() call can be partially loaded.  A node that has the
+            Loaded state of Full indicates that all attributes and direct children are loaded, but it does
+            not verify that the children themselves are also fully loaded.  Use the IsFullyLoaded property
+            to also ensure the children's state.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlFragment.NextPosition">
+            <summary>
+            NextPosition is an internal reference used during the partial loading process.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlFragment.StartPosition">
+            <summary>
+            For diagnostic use only.  Only available from seekable streams.
+            </summary>        
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlFragment.LoadElements(WileyBlack.Dml.DmlReader,System.Boolean)">
+            <summary>
+            LoadElements() performs a full or partial load of all elements.  Use of the Partial option
+            requires a seekable stream, since it loads only the location of child elements when possible.
+            </summary>
+            <param name="Reader"></param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlFragment.LoadPartial(WileyBlack.Dml.DmlReader,WileyBlack.Dml.Dom.DmlFragment.LoadState)">
+            <summary>
+            LoadPartial() is similar to LoadContent() but provides control over what portion of the fragment
+            should be loaded.  LoadPartial() will throw an exception if the stream is not seekable.  LoadPartial() will 
+            load the section requested by ToLoad, but will generate minimally-loaded DmlContainers whenever 
+            possible (that is, every time the container provides a data size).  LoadPartial() can then be called
+            on a child element to load an additional level.  LoadContent() can be called on any of the partially 
+            loaded Children to fully load that container and all children.  Providing a ToLoad value of 
+            LoadState.Full to LoadPartial() loads everything in the current level, but does not load the child
+            elements.
+            </summary>
+            <seealso>Loaded, IsFullyLoaded, LoadContent()</seealso>
+            <param name="Reader">DmlReader providing stream and dml access.</param>
+            <param name="ToLoad">Section of the container to be loaded.</param>
+        </member>
+        <member name="P:WileyBlack.Dml.Dom.DmlFragment.IsFullyLoaded">
+            <summary>
+            IsFullyLoaded indicates if the DML container and all children are loaded.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlContainer.LoadAttributes(WileyBlack.Dml.DmlReader)">
+            <summary>
+            LoadAttributes() loads only the attributes section.  The loaded state must be IdOnly coming in and will be
+            either Full or Attributes after completion.
+            </summary>
+            <param name="Reader"></param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlContainer.LoadElements(WileyBlack.Dml.DmlReader,System.Boolean)">
+            <summary>
+            LoadElements() performs a full or partial load of all elements.  Use of the Partial option
+            requires a seekable stream, since it loads only the location of child elements when possible.
+            </summary>
+            <param name="Reader"></param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlContainer.LoadContent(WileyBlack.Dml.DmlReader)">
+            <summary>
+            LoadContent() will completely load the remainder of the container's content.  If a LoadPartial()
+            operation has previously been performed on this container, LoadContent() will seek as necessary
+            and completely load the container and all children.
+            </summary>
+            <seealso>Loaded, IsFullyLoaded, LoadPartial()</seealso>
+            <param name="Reader">DmlReader to read the container from.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlContainer.LoadPartial(WileyBlack.Dml.DmlReader,WileyBlack.Dml.Dom.DmlFragment.LoadState)">
+            <summary>
+            LoadPartial() is similar to LoadContent() but provides control over what portion of the container
+            should be loaded.  LoadPartial() will throw an exception if the stream is not seekable.  LoadPartial() will 
+            load the section requested by ToLoad, but will generate minimally-loaded DmlContainers whenever 
+            possible (that is, every time the container provides a data size).  LoadPartial() can then be called
+            on a child element to load an additional level.  LoadContent() can be called on any of the partially 
+            loaded Children to fully load that container and all children.
+            </summary>
+            <seealso>Loaded, IsFullyLoaded, LoadContent()</seealso>
+            <param name="Reader">DmlReader providing stream and dml access.</param>
+            <param name="ToLoad">Section of the container to be loaded.</param>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlContainer.WriteContentSize">
+            <summary>
+            Enable the WriteContentSize flag in order to automatically generate a DML:Content-Size attribute during
+            the WriteTo() operation.  All child nodes must implement a GetEncodedSize() operation without returning
+            UInt64.MaxValue or a NotSupportedException will be generated.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.Dom.DmlContainer.ActiveTranslation">
+            <summary>Translation retrieves the DML Translation in effect at this container.  DML Containers
+            may (re)define DML ID associations as they nest, or they may propagate their parent's translation
+            unaltered.</summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlDocument.GlobalTranslation">
+            <summary>
+            GlobalTranslation provides the top-level translation currently associated with this
+            document.  When reading a DML document, this translation is populated by the Load()
+            routine if name resolution is provided, or if a translation is provided.  When
+            writing a DML document, this translation should be provided.  
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlDocument.Header">
+            <summary>
+            Header contains the DmlHeader for the document.  The DML:Header container provides
+            processing rules for the document and starts every DML document.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlDocument.m_ResolvedHeader">
+            <summary>
+            See ResolvedHeader.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.Load(System.IO.Stream)">
+            <summary>
+            The Load() method populates the DmlDocument from a DML formatted stream.  An in-memory
+            tree is generated from the DML stream.  No resource resolution is provided and an error
+            is generated if additional resources are required.
+            </summary>
+            <param name="Source">The stream from which to generate the in-memory DmlDocument</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.Load(WileyBlack.Dml.DmlReader)">
+            <summary>
+            The Load() method populates the DmlDocument from a DML formatted stream.  An in-memory
+            tree is generated from the DML stream.  No resource resolution is provided and an error
+            is generated if additional resources are required.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.Load(System.String)">
+            <summary>
+            The Load() method populates the DmlDocument from a DML formatted file.  An in-memory
+            tree is generated from the DML stream.  No resource resolution is provided and an error
+            is generated if additional resources are required.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.Load(System.IO.Stream,WileyBlack.Dml.DmlTranslation)">
+            <summary>
+            The Load() method populates the DmlDocument from a DML formatted stream.  An in-memory
+            tree is generated from the DML stream.
+            </summary>
+            <param name="Source">The stream from which to generate the in-memory DmlDocument</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.Load(WileyBlack.Dml.DmlReader,WileyBlack.Dml.DmlTranslation)">
+            <summary>
+            The Load() method populates the DmlDocument from a DML formatted stream.  An in-memory
+            tree is generated from the DML stream.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.Load(System.IO.Stream,WileyBlack.Dml.IResourceResolution)">
+            <summary>
+            The Load() method populates the DmlDocument from a DML formatted stream.  An in-memory
+            tree is generated from the DML stream.  
+            </summary>
+            <param name="Source">The stream from which to generate the in-memory DmlDocument</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.Load(WileyBlack.Dml.DmlReader,WileyBlack.Dml.IResourceResolution)">
+            <summary>
+            The Load() method populates the DmlDocument from a DML formatted stream.  An in-memory
+            tree is generated from the DML stream.  
+            </summary>        
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.LoadPartial(System.IO.Stream,WileyBlack.Dml.Dom.DmlFragment.LoadState)">
+            <summary>
+            The LoadPartial() method populates the top-level of the DmlDocument from a DML formatted stream.  An 
+            in-memory tree is generated from the DML stream.  The portion of the tree that is loaded is controlled
+            by the ToLoad value.  An incorrect LoadPartial() sequence will cause an exception.  No resource 
+            resolution is provided and an error is generated if additional resources are required.
+            </summary>
+            <param name="Source">The stream from which to generate the in-memory DmlDocument</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.LoadPartial(WileyBlack.Dml.DmlReader,WileyBlack.Dml.Dom.DmlFragment.LoadState)">
+            <summary>
+            The LoadPartial() method populates the top-level of the DmlDocument from a DML formatted stream.  An 
+            in-memory tree is generated from the DML stream.  The portion of the tree that is loaded is controlled
+            by the ToLoad value.  An incorrect LoadPartial() sequence will cause an exception.  No resource 
+            resolution is provided and an error is generated if additional resources are required.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.LoadPartial(System.IO.Stream,WileyBlack.Dml.Dom.DmlFragment.LoadState,WileyBlack.Dml.DmlTranslation)">
+            <summary>
+            The LoadPartial() method populates the top-level of the DmlDocument from a DML formatted stream.  An 
+            in-memory tree is generated from the DML stream.  The portion of the tree that is loaded is controlled
+            by the ToLoad value.  An incorrect LoadPartial() sequence will cause an exception.  No resource 
+            resolution is provided and an error is generated if additional resources are required.
+            </summary>
+            <param name="Source">The stream from which to generate the in-memory DmlDocument</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.LoadPartial(WileyBlack.Dml.DmlReader,WileyBlack.Dml.Dom.DmlFragment.LoadState,WileyBlack.Dml.DmlTranslation)">
+            <summary>
+            The LoadPartial() method populates the top-level of the DmlDocument from a DML formatted stream.  An 
+            in-memory tree is generated from the DML stream.  The portion of the tree that is loaded is controlled
+            by the ToLoad value.  An incorrect LoadPartial() sequence will cause an exception.  No resource 
+            resolution is provided and an error is generated if additional resources are required.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlDocument.LoadPartial(System.IO.Stream,WileyBlack.Dml.Dom.DmlFragment.LoadState,WileyBlack.Dml.IResourceResolution)">
+            <summary>
+            The LoadPartial() method populates the top-level of the DmlDocument from a DML formatted stream.  An 
+            in-memory tree is generated from the DML stream.  The portion of the tree that is loaded is controlled
+            by the ToLoad value.  An incorrect LoadPartial() sequence will cause an exception.  
+            </summary>
+            <param name="Source">The stream from which to generate the in-memory DmlDocument</param>
+        </member>
+        <!-- Badly formed XML comment ignored for member "M:WileyBlack.Dml.Dom.DmlDocument.LoadPartial(WileyBlack.Dml.DmlReader,WileyBlack.Dml.Dom.DmlFragment.LoadState,WileyBlack.Dml.IResourceResolution)" -->
+        <member name="P:WileyBlack.Dml.Dom.DmlDocument.ResolvedHeader">
+            <summary>
+            After LoadHeader() has been called, ResolvedHeader contains the header information
+            reduced to its fully processed representation.  The ResolvedHeader will be a
+            DomResolvedTranslation object if resolution included the XmlRoot element.  This
+            is always true when using DOM to resolve the header, but the resulting XmlRoot
+            will only be valid if the IResourceResolution provider also provided 
+            DomResolvedTranslation objects when returning any pre-processed resource.  Note
+            that ResolvedHeader is not updated if Header is changed, and changes made to the
+            ResolvedHeader will not be captured by Header, Save(), or WriteTo() operations.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.Dom.DmlInt">
+            The U8 array type is also part of the base primitive set, but is 
+            listed under the array primitives for consistency. *
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlCompressed.Validated">
+            <summary>
+            Validated is true when the decompressed fragment was validated against a CRC-32 provided
+            during the loading process.  If no CRC-32 code was provided, or this node was generated
+            in-memory instead of from a stream, then Validated is false.  If a validation code
+            was provided but failed the validation process, an exception would have been thrown
+            during LoadContent().  DmlCompressed nodes written out to a stream using this class
+            always include a CRC-32 in the output stream.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlCompressed.m_CompressedFragment">
+            <summary>
+            During the writing process, both GetEncodedSize() and WriteTo() are called sequentially.  We
+            could simply return an unknown size, but that would reduce one of the key uses of the DOM
+            representation - writing containers with known sizes.  We want to avoid performing the
+            compression operation twice, so we cache the compression in GetEncodedSize() and reuse it in
+            WriteTo().  The cache'd version is m_CompressedFragment.  Retrieving or setting 
+            DecompressedFragment invalidates the cache.  The CRC-32 is also cached.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.DmlTranslation">
+            <summary>
+            A DmlTranslation consists of a set of associations.  Depending on the caller's action,
+            there may be multiple ways to reference a particular assocation.  For example, a DmlReader
+            locates associations using the DMLID.  A DmlWriter may utilize the DMLID, but could also
+            be using the name and type to find an association.  The DmlTranslation class provides
+            access to the set of associations from either the DMLID or the DMLName.  It also provides
+            the hierarchical scan algorithm that DML defines, permitting a search at the current
+            level of the tree and then advancing up if no match is found.  Access to the associations
+            is provided as an O(1) operation by DML ID or Name.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.Add(WileyBlack.Dml.Association)">
+            <summary>
+            Adds the specified association to the translation.  An exception is thrown if a DMLID or
+            properties conflict occur on this level.
+            </summary>
+            <param name="Assoc">Information to associate</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.Assign(WileyBlack.Dml.DmlName,WileyBlack.Dml.DmlTranslation)">
+            <summary>
+            Assign() adds a new association to the translation by locating the next unused DML ID value.
+            </summary>
+            <param name="Name">The XMLName and type to create an automatic association with</param>
+            <param name="LocalNamespace">A local translation to associate with this entry (containers only)</param>
+            <returns>The DML ID chosen for the association</returns>        
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.Assign(WileyBlack.Dml.DmlName)">
+            <summary>
+            Assign() adds a new association to the translation by locating the next unused DML ID value.
+            </summary>
+            <param name="Name">The XMLName and type to create an automatic association with</param>        
+            <returns>The DML ID chosen for the association</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.Renumber(System.UInt32,System.UInt32)">
+            <summary>
+            Renumber() can be used to change the DMLID of an association.  An exception is
+            thrown if the NewDMLID value is already in use.
+            </summary>
+            <param name="DMLID">Dml ID value to change.</param>
+            <param name="NewDMLID">New Dml ID value to assign for the association.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.Contains(System.UInt32)">
+            <summary>
+            Determines whether the translation contains an association for the DML ID.
+            </summary>
+            <param name="DMLID">DML ID to check for an association</param>
+            <returns>True if an association exists for this ID.  False otherwise.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.Contains(WileyBlack.Dml.DmlName)">
+            <summary>
+            Determines whether the translation contains an association for the XML Name and DML Type.
+            </summary>
+            <param name="Name">The DML Name (consisting of an XML Name and DML Type) to check for an association</param>
+            <returns>True if an association exists for this name.  False otherwise.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.TryGet(System.UInt32,WileyBlack.Dml.Association@)">
+            <summary>
+            Gets the association for the specified DML ID.
+            </summary>
+            <param name="DMLID">The ID of the name to retrieve.</param>
+            <param name="Result">When this method returns, contains the association with the given DMLID if it
+            exists.  Otherwise contains null.</param>
+            <returns>True if the translation contains an association for the given DML ID.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.TryGet(WileyBlack.Dml.DmlName,WileyBlack.Dml.Association@)">
+            <summary>
+            Gets the association for the specified XML Name and DML Type.
+            </summary>
+            <param name="Name">The name of the DML ID to retrieve.</param>
+            <param name="Result">When this method returns, contains the association with the given name if it
+            exists.  Otherwise contains null.</param>
+            <returns>True if the translation contains an association for the given name.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.TryFind(System.UInt32,WileyBlack.Dml.Association@)">
+            <summary>
+            Gets the association for the specified DML ID, including a search up the translation tree.
+            </summary>
+            <param name="DMLID">The ID of the name to retrieve.</param>
+            <param name="Result">When this method returns, contains the association with the given DMLID if it
+            exists.  Otherwise contains null.</param>
+            <returns>True if the translation or its parents contain an association for the given DML ID.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.TryFind(WileyBlack.Dml.DmlName,WileyBlack.Dml.Association@)">
+            <summary>
+            Gets the association for the specified XML Name and DML Type, including a search up the translation tree.
+            </summary>
+            <param name="Name">The name of the DML ID to retrieve.</param>
+            <param name="Result">When this method returns, contains the association with the given name if it
+            exists.  Otherwise contains null.</param>
+            <returns>True if the translation or its parents contain an association for the given name.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.Clear">
+            <summary>
+            Removes all associations from this translation.  Does not affect the translation's parent relationship.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.#ctor">
+            <summary>
+            Use this constructor to create a local translation only.  The parent translation will
+            be assigned by the Association() constructor when this translation is passed as the local
+            translation.  To create a top-level translation instead, begin with a clone of the DML3 
+            translation and use Add() calls.  
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.CloneUp(WileyBlack.Dml.DmlTranslation,WileyBlack.Dml.DmlTranslation)">
+            <summary>
+            CloneUp() is a helper function for the Clone() routine that deep copies a DmlTranslation and all
+            its parents, but excludes one specific local translation entry.  That entry is not cloned but
+            replaced with the provided version instead.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlTranslation.Clone(System.Boolean)">
+            <summary>
+            Clone() generates a deep copy of this DmlTranslation, including local translations
+            that are attached.  If IncludeParents is true, then parent translations are also
+            cloned via deep copy.  If IncludeParents is false, then the parent translation is
+            set to null for the returned translation (that is, it is detached).
+            </summary>
+            <returns>An identical copy of the original DmlTranslation, including clones of
+            any parent translations and clones of all associations.</returns>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlTranslation.DML3">
+            <summary>
+            DML3 provides the built-in DML Version 3 translation.  The DmlTranslation type does not
+            provide any public constructors because all translations should begin with one of the 
+            built-in translations.  Use DmlTranslation MyTranslation = DmlTranslation.DML3.Clone() to 
+            initialize a new translation based upon the DML3 translation.
+            </summary>        
+        </member>
+        <member name="F:WileyBlack.Dml.DmlTranslation.TSL2">
+            <summary>
+            TSL2 provides the built-in DML Translation language translation, which also includes the
+            DML3 built-in translation.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlTranslation.EC2">
+            <summary>
+            EC2 provides the built-in DML-EC2 Namespace, which also includes the DML3 built-in
+            namespace.
+            </summary>        
+        </member>
+        <member name="P:WileyBlack.Dml.DmlTranslation.Item(System.UInt32)">
+            <summary>
+            Retrieves or creates the local association for the specified DMLID.
+            </summary>
+            <param name="DMLID">DML ID to retrieve or associate the name with.</param>
+            <returns>The local association for this DMLID.</returns>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlTranslation.Item(WileyBlack.Dml.DmlName)">
+            <summary>
+            Retrieves or creates the local association for the specified DML Name.
+            </summary>
+            <param name="Name">Name to retrieve or associate the ID with.</param>
+            <returns>The local association for this DMLName.</returns>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlTranslation.Count">
+            <summary>
+            Gets the number of associations contained in this translation.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.DmlTranslation.Enumerator">
+            <summary>
+            A custom IEnumerator implementation is required because the dictionary's
+            enumerators include the key-value pairing, whereas we incorporate all that
+            information into an Association.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.ResolvedTranslation">
+            <summary>
+            ResolvedTranslation provides the processed form of a DML Translation
+            document or DML Header.  It can be provided as a response from 
+            IResourceResolution to provide cache'd (previously processed) results.
+            When using DOM, the DomResolvedTranslation class is preferable as it 
+            also retains the XmlRoot value.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.IResourceResolution">
+            <summary>
+            The IResourceResolution interface provides a name resolution service that DOM or
+            DmlReader can call on when additional translation resources are required.
+            A null IResourceResolution can be provided to disable additional resource retrieval.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.IResourceResolution.Resolve(System.String,System.Boolean@)">
+            <summary>
+            The Resolve interface method retrieves or opens the URI specified and returns a
+            resource.  The resource can be a Stream that can be used to parse the resource, 
+            or a ResolvedTranslation that contains the already processed resource.  If the 
+            returned object is a Stream and contains an XML document, IsXml should be true.  
+            If it specifies a DML document, IsXml should be false.  When a ResolvedTranslation
+            is returned, the IsXml parameter is ignored.  A DomResolvedTranslation object
+            (which is derived from ResolvedTranslation) can also be returned.
+            </summary>
+            <param name="Uri">The URI containing the requested resource.</param>
+            <param name="IsXml">True if the URI points to an XML document.  False if the URI points to a DML document.</param>
+            <returns>A Stream that can be used to access the resource or a ResolvedTranslation object.</returns>
+        </member>
+        <member name="T:WileyBlack.Dml.WebResourceResolution">
+            <summary>
+            WebResourceResolution provides a simple full-access resource retrieval via URI which 
+            can be provided to enable web and local URI retrieval for DML translation documents.  
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlName.PrimitiveType">
+            <summary>
+            PrimitiveType is only relevant for NodeTypes.Primitive.  Otherwise its value should be ignored.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlName.ArrayType">
+            <summary>
+            ArrayType is only relevant when PrimitiveType is Array or Matrix.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlName.Extension">
+            <summary>
+            Extension is only relevant when PrimitiveType is Extension.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlName.TypeId">
+            <summary>
+            TypeId is provided by the Extension for its own recognition purposes.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Association.LocalTranslation">
+            <summary>
+            LocalTranslation provides a DmlTranslation if a local subset is defined by use of this node.  
+            LocalTranslation is null if no local translation subset is defined, in which case the parent's translation
+            is in effect.  Local translations can only be provided by DML Containers.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.Association.InlineIdentification">
+            <summary>
+            InlineIdentification, when true, indicates that the association should be made using inline 
+            identification at the node.  If false, the association is part of the translation 
+            document instead.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.PrimitiveSet.Set">
+            <summary>
+            Set gives the name of the set of primitives referenced.  For example,
+            "common" or "arrays".
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.PrimitiveSet.Codec">
+            <summary>
+            Codec provides the name of the codec for encoding and decoding the primitives,
+            if one is specified.  If the codec is not specified, this string is empty.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.PrimitiveSet.CodecURI">
+            <summary>
+            CodecURI can provide a location for software that can handle this codec.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.NodeTypes.Composite">
+            <summary>
+            Composite represents a higher-level structure which may contain multiple DML
+            types.  Composite is not present in DML encoding, but in-memory structures
+            may utilize it.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.NodeTypes.Structural">
+            <summary>
+            Structural nodes are utilized as part of the encoding and should not
+            be utilized at a higher-level.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.NodeTypes.Unknown">
+            <summary>
+            Unknown indicates that the node type is not recognized.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.NodeTypes.Container">
+            <summary>
+            DML Container Elements contain attributes, and any number of children.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.NodeTypes.Primitive">
+            <summary>
+            Indicates an element containing a single primitive type.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.NodeTypes.EndAttributes">
+            <summary>
+            EndAttributes indicates that the attributes section of the current container
+            is closed and the elements section follows.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.NodeTypes.EndContainer">
+            <summary>
+            EndContainer indicates that the last Container Element read has been closed.  
+            This may or may not correspond to an actual node in the DML stream (as this
+            condition is usually implied), but it is a proper structural representation of 
+            the DML.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.NodeTypes.Comment">
+            <summary>
+            Comments are nodes which are to be ignored for all purposes except to
+            describe something about the structure during encoding or tree analysis.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.NodeTypes.Padding">
+            <summary>
+            Padding are nodes which are to be ignored.  They can be used to reserve
+            space for later overwriting or to mark regions invalid.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.PrimitiveTypes.Extension">
+            <summary>Extension indicates that the primitive is recognized and supported by an extension handler.</summary>
+        </member>
+        <member name="F:WileyBlack.Dml.ParsingOptions.DiscardComments">
+            <summary>
+            Set DiscardComments to true (default) to instruct the DmlReader to automatically discard comments
+            without presenting them as a result of a Read() call.  When false, Read() will provide
+            comments.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.ParsingOptions.DiscardPadding">
+            <summary>
+            Set DiscardPadding to true (default) to instruct the DmlReader to automatically discard padding
+            without presenting them as a result of a Read() call.  When false, Read() will provide
+            padding.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DomResolvedTranslation.XmlRoot">
+            <summary>
+            XmlRoot is provided by DOM translation as long as all resources provide the information.  If
+            a IResourceResolution provides a ResolvedTranslation object instead of a DomResolvedTranslation
+            object, then XmlRoot will become null.  If correctly resolved, XmlRoot will provide a DmlContainer,
+            even if empty.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.Dom.DomAssociation">
+            <summary>
+            DomAssociation is a replacement for the Association class that is used when DOM is used
+            to parse a header in detailed mode.  DomAssociation provides an identically functional
+            Association object, but retains addition information that can be useful to programmatic
+            header and translation document construction, analysis, or manipulation.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.Dom.ITranslationLanguage">
+            <summary>
+            ITranslationLanguage provides an interface to common functionality found in DmlHeader and
+            DmlTranslationDocument.  Since both classes operate on the same translation language, there
+            is common tools for accessing, parsing, analyzing, and translating these DML objects.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.Dom.DmlTranslationDocument">
+            <summary>
+            The DmlTranslationDocument can be used to read a DML translation document obeying the 
+            translation v2 specification.  Call the static LoadTranslation() method to load and
+            interpret a translation document to a DmlTranslation object.  Call Load() to read the 
+            translation in its DOM form.  Once loaded, the ToTranslation() method can still be used 
+            to interpret the translation document's DML into an in-memory DmlTranslation object.  
+            
+            The DmlTranslationDocument can also be used to write a DML translation document, although
+            it is usually a more elegant solution ton construct such a document by-hand.  To write a 
+            DML translation document use the FromTranslation() method to populate the translation 
+            information and call the Save() method.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlTranslationDocument.LoadArbitraryFromXml(WileyBlack.Dml.Dom.DmlContainer,System.Xml.XmlReader)">
+            <summary>
+            LoadArbitraryFromXml() is used when parsing DML:Include-Primitives directives that
+            contain arbitrary xml elements for configuration.  The Xml is converted to Dml
+            nodes.
+            </summary>        
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlTranslationDocument.ReducePrimitiveSets(System.Collections.Generic.List{WileyBlack.Dml.PrimitiveSet})">
+            <summary>
+            ReducePrimitiveSets() is called internally to resolve multiple instance of the same 
+            primitive set with the last entry.  For example, consider a DML Header that includes 
+            a DML Translation document utilizing the array primitive set but omitting a codec
+            specification.  The DML Header specifies the necessary codec in a second
+            &lt;DML:Include Primitives=... /&gt; directive.  This can result in two
+            instances of the array codec being referenced, but the last one takes
+            precedence.  ReducePrimitiveSets() will reduce the set to only those that have
+            final precedence.
+            </summary>
+            <param name="PrimitiveSets"></param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlTranslationDocument.ToTranslation(WileyBlack.Dml.IResourceResolution,WileyBlack.Dml.ParsingOptions)">
+            <summary>
+            Call the ToTranslation() method to interpret the content of the DmlTranslationDocument into
+            a DmlTranslation.  An IResourceResolution object may be provided to retrieve dependencies,
+            or null can be provided.  An exception is thrown if any inclusions are encountered and
+            cannot be resolved.
+            </summary>
+            <returns>The DmlTranslation represented by this DML Translation document.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlTranslationDocument.FromTranslation(WileyBlack.Dml.DmlTranslation,System.Collections.Generic.List{WileyBlack.Dml.Dom.DomPrimitiveSet},WileyBlack.Dml.Dom.DmlContainer)">
+            <summary>
+            <para>Call the FromTranslation() method to translate a DmlTranslation object into the DML representation
+            provided by DmlTranslationDocument.  Any existing document content is replaced by the translation 
+            representation.</para>
+            <para>Note that the representation provided by the FromTranslation() method is machine-generated and
+            may not be the most clear representation of a DML translation.  In particular, any references that
+            were already resolved are not replaced by &lt;Include&gt; directives that can significantly
+            simplify a DML translation document.</para>        
+            </summary>
+            <param name="TSL">The DmlTranslation from which to generate this DmlTranslationDocument's content.</param>
+            <param name="PrimitiveSets">An optional list of primitive sets to be required by this 
+            DmlTranslationDocument.</param>
+            <param name="XmlRoot">An optional XmlRoot container.  The XmlRoot container is attached at the top-level
+            of a Dml document if the document is converted to Xml.  It can contain attributes such as Xml namespace
+            references.</param>
+        </member>
+        <member name="P:WileyBlack.Dml.Dom.DmlTranslationDocument.Version">
+            <summary>
+            Retrieves or sets the Version value for this translation document.  This is the version of the
+            translation language being used, not the DML version.  If a DML document does not contain this 
+            attribute, then the default value is assumed.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.Dom.DmlTranslationDocument.ReadVersion">
+            <summary>
+            Retrieves or sets the ReadVersion value for this translation document.  This is the version of the
+            translation language being used, not the DML version.  If a DML document does not contain this 
+            attribute, then the Version value is used.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.DmlReader">
+            <summary>
+            <para>Implements a reader for the Data Markup Language (DML).</para>
+            
+            <para>The DmlReader is instantiated by a Create() call.  Repeated calls to Read() can then be made.
+            After each call to Read(), several properties are available that provide characterization
+            of the node.</para>
+            
+            <para>After each call to Read() the caller may utilize one of the retrieval functions to gather the content
+            of the node, usually based on the properties describing it.  Methods are available for reading the 
+            content of attributes and elements.</para>
+            
+            <para>If the node represents a container, then the properties available after the Read() call will
+            provide characteristics of the container such as name, and NodeType will return Container.  The DmlReader
+            will automatically descend into the container, but a navigation function called MoveOutOfContainer() is 
+            available to navigate out of the container without needing to read its contents.  If MoveOutOfContainer() is
+            not used, then Read() calls can continue within the container until an EndContainer node appears.  The
+            EndContainer node may represent an actual end marker (for variable-length containers), or it may be
+            generated by the DmlReader to signal that the end of a fixed-length container has been reached.</para>
+            
+            <para>The DmlReader provides a series of Get..() methods.  These calls can be made once after a Read() call 
+            in order to retrieve the data content of the node.  If an node is not recognized or not 
+            interesting to the caller, the caller may proceed directly to the next Read() call to skip it.  The 
+            Get..() call made must match the node type in the stream or an exception is thrown.  The properties
+            available after the Read() call can be used to determine the node type prior to calling Get..().</para>
+            
+            <para>The DmlReader provides limited navigation in order to support non-seeking streams and utilize
+            minimum memory state.  The in-memory types are also available for more flexible parsing.</para>
+            </summary>
+            
+            <example>An example of DmlReader usage is provided:
+            <code>
+            DmlReader MyReader = DmlReader.Create(MyStream);    
+            while (MyReader.Read())
+            {
+                switch (MyReader.NodeType)
+                {
+                    case NodeTypes.Container:
+                        Console.Write("&lt;{0}", MyReader.Name); 
+                        break;
+                    case NodeTypes.EndAttributes: Console.Write("%gt;\n"); break;
+                    case NodeTypes.EndContainer: Console.Write("&lt;/{0}&gt;\n", MyReader.Container.Name); break;    
+                    case NodeTypes.Primitive: 
+                        if (MyReader.IsAttribute)
+                            Console.Write(" {0}=\"{1}\"", MyReader.Name, MyReader.GetAsString());     
+                        else
+                            Console.Write("\t&lt;{0}&gt;{1}&lt;/{0}&gt;\n", MyReader.Name, MyReader.GetAsString()); 
+                        break;    
+                    case NodeTypes.Comment:
+                        Console.Write("&lt;!-- {0} --&gt;\n", MyReader.GetComment();
+                        break;
+                }
+            }
+            </code></example>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.AddPrimitiveSet(System.String)">
+            <summary>
+            Call AddPrimitiveSet() to attempt to enable a primitive set that is required for the DML document to
+            be read.  If a primitive set is not supported, an exception will be thrown.  Nodes with the requested
+            type(s) cannot be read until the codec is also specified.
+            </summary>
+            <param name="SetName">Primitive set required.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.AddPrimitiveSet(System.String,System.String)">
+            <summary>
+            Call AddPrimitiveSet() to attempt to enable a primitive set and matching codec that is required for 
+            the DML document to be read.  If a primitive set or codec is not supported, an exception will be thrown.
+            </summary>
+            <param name="SetName">Primitive set required.</param>
+            <param name="Codec">Codec name for primitive set.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.AddPrimitiveSet(WileyBlack.Dml.PrimitiveSet)">
+            <summary>
+            Call AddPrimitiveSet() to attempt to enable a primitive set and matching codec that is required for 
+            the DML document to be read.  If a primitive set or codec is not supported, an exception will be thrown.
+            </summary>
+            <param name="Set">Primitive set required.</param>        
+        </member>
+        <member name="F:WileyBlack.Dml.DmlReader.Association">
+            <summary>Association provides the complete association for the node from the most recent Read() call.</summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlReader.IsAttribute">
+            <summary>
+            IsAttribute (when true) indicates that the current node is part of the attribute list of the current container.  When
+            false, the current node is part of the elements list of the current container.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlReader.OutstandingStream">
+            <summary>
+            Used with data, encrypted, and decrypted nodes.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.Read">
+            <summary>
+            The Read() function reads the node head for the next node.  The actual contents of the
+            node are retrieved by the Get..() calls or are skipped if another Read() call is made before
+            being retrieved.
+            </summary>
+            <returns>True if a node was read.  False if the end of the document has been reached.  Throws
+            exceptions if any format violation occurs.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetUInt">
+            <summary>
+            Retrieves the value for an unsigned integer primitive.
+            </summary>
+            <returns>Value</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetString">
+            <summary>
+            Retrieves the value for a string primitive.
+            </summary>
+            <returns>Value</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetByteArray">
+            <summary>
+            Retrieves the value of byte arrays as a byte[].
+            </summary>
+            <returns>Data content</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetArrayAsStream">
+            <summary>
+            GetAsStream() retrieves the contents of a byte array node opened by the most recent Read() call as a Stream.  The Stream
+            can only be used until the next Read() call is issued.
+            </summary>
+            <returns>A stream representing the data in the array.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetInt">
+            <summary>
+            Retrieves the value for a signed integer primitive.
+            </summary>
+            <returns>Value</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetBoolean">
+            <summary>
+            Retrieves the value for a boolean primitive.
+            </summary>
+            <returns>Value</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetDateTime">
+            <summary>
+            Retrieves the value for a date/time primitive.
+            </summary>
+            <returns>Value</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetSingle">
+            <summary>
+            Retrieves the value for a single-precision floating-point primitive.
+            </summary>
+            <returns>Value</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetDouble">
+            <summary>
+            Retrieves the value for a double-precision floating-point primitive.
+            </summary>
+            <returns>Value</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetDecimal">
+            <summary>
+            Retrieves the value for a base-10 (decimal) floating-point primitive.
+            </summary>
+            <returns>Value</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetExtension">
+            <summary>
+            GetExtension() retrieves the extension currently handling the open node.  An exception is thrown if a node is not
+            presently open (following a Read() call) or if the node does not utilize an extension (check that PrimitiveType is
+            PrimitiveTypes.Extension before calling.)  The extension class can provide additional ancillary information about
+            the node prior to deciding whether to call GetExtended() to retrieve the node's content.  For example, if the
+            extension handles images, then GetExtension() and the extension class might provide width and height information
+            while the GetExtended() call provides the actual Bitmap object from the node.
+            </summary>
+            <returns>The extension which is handling the extension node from the most recent Read() call.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetExtended">
+            <summary>
+            The GetExtended() method retrieves the contents of the extension node.  The GetExtension() class may be useful
+            for retrieving ancillary information about the node prior to calling GetExtended().
+            </summary>
+            <seealso>GetExtension()</seealso>
+            <returns>The node's content in the format provided by the extension.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetComment">
+            <summary>
+            Retrieves the text for a comment node.        
+            </summary>
+            <returns>Comment text</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetPaddingSize">
+            <summary>
+            Retrieves the size of a padding node, including the bytes used for the data size but not counting 
+            the node head.  For single-byte padding, returns zero.
+            </summary>
+            <returns>The size, in bytes, of the padding content and padding data size indicator.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetAsObject">
+            <summary>
+            Retrieves the value of the current node as a general object.  An exception is thrown if the
+            node is not an attribute or primitive which is recognized and available as as object.  Primitive
+            types will return the associated C# base type (i.e. if the primitive is an integer, then a
+            C# long will be returned.)  Encrypted nodes will throw an exception using GetAsObject(), since 
+            a key is required for retrieval.  Compressed nodes will return a DmlReader.  For extension
+            nodes, the return value will be the same as for a GetExtended() call.
+            </summary>
+            <returns>An object containing the value.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetAsUInt">
+            <summary>
+            Retrieves the value of the current node with conversion to an unsigned integer.  An exception is thrown if the
+            node is not an attribute or primitive of a compatible numeric type.
+            </summary>
+            <returns>The unsigned integer form of the value.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetAsULong">
+            <summary>
+            Retrieves the value of the current node with conversion to an unsigned long.  An exception is thrown if the
+            node is not an attribute or primitive of a compatible numeric type.
+            </summary>
+            <returns>The unsigned long form of the value.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetAsInt">
+            <summary>
+            Retrieves the value of the current node with conversion to an integer.  An exception is thrown if the
+            node is not an attribute or primitive of a compatible numeric type.
+            </summary>
+            <returns>The integer form of the value.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetAsLong">
+            <summary>
+            Retrieves the value of the current node with conversion to a long.  An exception is thrown if the
+            node is not an attribute or primitive of a compatible numeric type.
+            </summary>
+            <returns>The long form of the value.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetAsSingle">
+            <summary>
+            Retrieves the value of the current node with conversion to a single-precision float.  An exception is thrown if the
+            node is not an attribute or primitive of a compatible numeric type.
+            </summary>
+            <returns>The float form of the value.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetAsDouble">
+            <summary>
+            Retrieves the value of the current node with conversion to a double-precision floating-point value.  An exception is thrown if the
+            node is not an attribute or primitive of a compatible numeric type.
+            </summary>
+            <returns>The double form of the value.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetAsString">
+            <summary>
+            Retrieves the value of the current node with conversion to a string.  An exception is thrown if the
+            node is not an attribute or primitive of a compatible type.
+            </summary>
+            <returns>The string representation of the value.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.ReadToEnd(System.IO.Stream)">
+            <summary>
+            The ReadToEnd() is called in order to force the entire remaining stream to be
+            read.  If the user has already retrieved the entire stream, this function has 
+            no effect.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetEncryptedDml(System.Byte[])">
+            <summary>
+            GetEncryptedDml() retrieves a DmlReader providing the decrypted form an EncryptedDml primitive node.  A Key
+            must be provided for decryption.
+            </summary>
+            <seealso>ValidateEncryptedDml()</seealso>
+            <param name="Key">Key to be used for decryption.  Must match the key that was used for encryption.</param>
+            <returns>DmlReader providing access to the decrypted DML fragment.  Only valid until the next Read() or
+            ValidateEncryptedDml() call.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.ValidateEncryptedDml">
+            <summary>
+            ValidateEncryptedDml() can be called after GetEncryptedDml().  The decrypted DmlReader becomes invalid 
+            after the ValidateEncryptedDml() call, so retrieval from the DmlReader must be completed before
+            validation.
+            </summary>        
+            <returns>True if validation was performed successfully.  False if no validation information is available
+            in the DML stream.  An exception is thrown if validation is available but failed.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetCompressedDml">
+            <summary>
+            GetCompressedDml() retrieves a DmlReader providing the decompressed form of a CompressedDml primitive node.  
+            </summary>
+            <seealso>ValidateCompressedDml()</seealso>        
+            <returns>DmlReader providing access to the decompressed DML fragment.  Only valid until the next Read() or
+            ValidateCompressedDml() call.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.ValidateCompressedDml">
+            <summary>
+            ValidateCompressedDml() can be called after GetCompressedDml().  The decompressed DmlReader becomes invalid 
+            after the ValidateCompressedDml() call, so retrieval from the DmlReader must be completed before
+            validation.
+            </summary>        
+            <returns>True if validation was performed successfully.  False if no validation information is available
+            in the DML stream.  An exception is thrown if validation is available but failed.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.MoveOutOfContainer">
+            <summary>
+            MoveOutOfContainer() permits the caller to navigate the reader out of the present container.
+            This operation can be time consuming for large containers, and it is often preferable to
+            design the DML file format such that seeking is practical.
+            </summary>
+            <seealso>Container.IsSizeKnown</seealso>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.GetContext">
+            <summary>
+            GetContext() is used with seekable streams in order to navigate.  The returned DmlContext
+            can be used to return to the current read position, but can also be used in order to
+            seek to a new position within the same container.  In order to seek in a DML tree, the 
+            DmlReader must know what context the stream will have at the new position.  Context 
+            identifies the current container and all higher-level containers in the tree.
+            </summary>
+            <returns>A DmlContext which can be used with the Seek..() methods.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.Seek(WileyBlack.Dml.DmlContext)">
+            <summary>
+            The Seek() method returns to a context retrieved by a GetContext() 
+            call.  The Seek..() methods require a seekable stream.
+            </summary>
+            <param name="Context">Context to return to.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.SeekAbsolute(WileyBlack.Dml.DmlContext,System.UInt64)">
+            <summary>
+            The SeekAbsolute() method repositions the DmlReader to the given
+            Position relative to the beginning of the stream.  The Seek..()
+            methods require a seekable stream.  The position must be part of 
+            the container belonging to the Context.  That is, the seek must be 
+            within the same container as the one when the GetContext() call was made.        
+            </summary>
+            <param name="Context">Context retrieved by GetContext() while reading
+            the container covering the position to seek to.</param>
+            <param name="Position">Position to seek to, from beginning of stream.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.SeekRelative(WileyBlack.Dml.DmlContext,System.UInt64)">
+            <summary>
+            The SeekRelative() method repositions the DmlReader to the given
+            Offset relative to the Context position.  The Seek..() methods require
+            a seekable stream.  The position must be within the same container as that
+            belonging to the Context.  
+            </summary>
+            <seealso>GetRelativePosition().</seealso>
+            <param name="Context">Context retrieved by GetContext() while reading
+            the container covering the position to seek to.</param>
+            <param name="Offset">Offset relative to the location where the Context
+            was retrieved.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.SeekOutOfBand(System.UInt64)">
+            <summary>
+            SeekOutOfBand() can be used with seekable streams where data is contained
+            beyond the end of the top-level container.  This data is out-of-band data
+            because it is not part of the top-level container, which conceptually 
+            includes all data in the DML stream.  Data is sometimes written "out-of-band"
+            in order to make it easy to append data.  The seek occurs under the
+            assumption that the out-of-band data belongs to the current DmlContext.
+            That is, the data behaves as if it is part of the current container and tree.
+            After the out-of-band data is read, Seek(Context) should be used to return
+            to the previous location before sequential parsing can continue.
+            </summary>
+            <seealso>DmlWriter.WriteReservedSpace()</seealso>        
+            <param name="Position">Position to seek, from beginning of stream.</param>
+            <returns>The current context which can be used to return to the current
+            location after the out-of-band data has been read.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlReader.ParseHeader(WileyBlack.Dml.IResourceResolution)">
+            <summary>
+            ParseHeader() can be used to process the Dml Header at the beginning of a document and setup the
+            DmlReader for parsing of the Dml Body.  This method is a quick way to setup the document for
+            ordinary Dml parsing, but cannot be used in all cases.  For example, the proper conversion of DML 
+            to XML requires the XmlRoot element, which is discarded here.  Primitive sets and the translation 
+            are loaded into the DmlReader but no listing is retained.  To load and retain the header, see the
+            DOM and DmlTranslationDocument in particular.
+            </summary>
+            <param name="Resources"></param>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlReader.ID">
+            <summary>
+            Provides the numeric DML Identifier of the node from the most recent Read() call.  To locate the XML-Compatible 
+            text name of an element, see the Name property of the DmlReader class instead.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlReader.Container">
+            <summary>Provides the properties of the current container.  When the NodeType is NodeTypes.EndContainer this provides 
+            information on the container being closed.</summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlReader.Name">
+            <summary>
+            Name provides the XML-Compatible name for the node from the most recent Read() call.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlReader.NodeType">
+            <summary>
+            NodeType identifies the kind of node from the most recent Read() call.  
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlReader.PrimitiveType">
+            <summary>
+            PrimitiveType identifies the data type of an attribute or element.  PrimitiveType can only be 
+            retrieved when the NodeType is NodeTypes.Primitive.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlReader.ArrayType">
+            <summary>
+            ArrayType identifies the unit primitive of an array attribute or element.  When PrimitiveType is
+            not an Array or Matrix, ArrayType returns ArrayTypes.Unknown.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlReader.NodeOpen">
+            <summary>
+            When NodeOpen is true, a Read() call has been made and a Get..() call is possible.  When it is false, a Read() call
+            is allowed but a Get..() call will raise an exception.  NodeOpen (when true) indicates that we have parsed a node's 
+            head and are waiting to retrieve the node content.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlReader.CanSeek">
+            <summary>
+            CanSeek checks whether the underlying stream is capable of seeking.  If the stream can seek,
+            the MoveOutOfContainer() operation is fast and the GetContext() and Seek...() methods are
+            available.  If the stream cannot seek, the MoveOutOfContainer() operation is slower and the
+            GetContext() and Seek...() methods will result in an exception.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.DmlReader.EncMessageStream">
+            <summary>
+            EncMessageStream parses the "Encrypted Message" format utilized in DML-EC's encrypted
+            nodes.  It manages the block count values and following blocks and provides them to
+            a reader, which would normally be a decryptor.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlContext.StartPosition">
+            <summary>
+            StartPosition stores the starting position of the container data if it is available (seekable
+            stream).  It has the value long.MaxValue if the stream is not seekable.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlContext.ContextPosition">
+            <summary>
+            ContextPosition is used only with specific navigation functions, and only on seekable streams.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.DmlContext.Association">
+            <summary>Provides the DML association of this container.</summary>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlContext.GetDiagnosticPosition">
+            <summary>
+            For diagnostic use only.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlContext.Container">
+            <summary>Returns the container of this container.  Returns null if this is a top-level
+            entity in the DML document or fragment.</summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlContext.ID">
+            <summary>Provides the numeric DML Identifier of the container.</summary>
+        </member>
+        <member name="P:WileyBlack.Dml.DmlContext.Name">
+            <summary>Name provides the XML-Compatible name for the container.  This property is only
+            available when using DmlReader.</summary>
+        </member>
+        <member name="T:WileyBlack.Dml.IDmlReaderExtension">
+            <summary>
+            The IDmlReaderExtension interface can be used to provide additional primitives and codecs
+            for use with DmlReader.  Provide extensions as part of the ParsingOptions provided at
+            DmlReader creation.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.IDmlReaderExtension.AddPrimitiveSet(System.String,System.String)">
+            <summary>
+            AddPrimitiveSet() is called when the DmlReader's AddPrimitiveSet() method cannot
+            recognize the primitive set name.  The AddPrimitiveSet() can return true to indicate
+            that the extension handles the set and codec (if provided).  The same AddPrimitiveSet()
+            call may be made repeatedly by the DmlReader and should continue to return true if
+            the set and codec are supported and handled by this extension.  If false is returned,
+            DmlReader checks with other registered extensions.  If none support the set, then
+            an exception is thrown.
+            </summary>
+            <param name="SetName">The value of the DML:Primitives attribute for the set being requested.</param>
+            <param name="Codec">If non-null, provides the value of the DML:Codec attribute for the set being requested.  If the
+            primitive set is handled by this extension but the codec is not supported, an exception should be thrown.</param>
+            <param name="Configuration">Can provide additional, opaque codec configuration information to the codec.</param>
+            <returns>True if the set and codec are recognized and supported and handled by this extension.  False otherwise.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.IDmlReaderExtension.Configure(System.String,System.String,System.Xml.XmlReader)">
+            <summary>
+            Configure() is called if the &lt;DML:Include-Primitives /&gt; directive includes
+            additional configuration information.  The XmlReader will be positioned at the
+            start of the configuration information, and must parse until an end element
+            is found.  Nested elements must be terminated as well.  An example parser
+            would follow this pattern:
+            <example>
+            void Configure(string SetName, string Codec, XmlReader Reader)
+            {
+                while (Reader.Read())
+                {
+                    if (Reader.NodeType == XmlNodeType.EndElement) return;
+                    if (Reader.NodeType != XmlNodeType.Element) continue;
+                
+                    switch (Reader.Name.ToLower())
+                    {
+                        // ...
+                    }
+                }
+            }
+            </example>
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.IDmlReaderExtension.Configure(System.String,System.String,WileyBlack.Dml.DmlReader)">
+            <summary>
+            Configure() is called if the &lt;DML:Include-Primitives /&gt; directive includes
+            additional configuration information.  The DmlReader will be positioned at the
+            start of the configuration information, and must parse until an end container
+            is found.  Nested elements must be terminated as well.  An example parser
+            would follow this pattern:
+            <example>
+            void Configure(string SetName, string Codec, DmlReader Reader)
+            {
+                for (; ; )
+                {
+                    if (!Reader.Read()) throw new NotSupportedException("Unterminated configuration directive in translation.");
+                    
+                    switch (Reader.NodeType)
+                    {
+                        case NodeTypes.Comment: continue;
+                        case NodeTypes.Padding: continue;
+                        case NodeTypes.EndContainer: return;
+                        case NodeTypes.Container:
+                            // Completely parse the nested container(s) and use as configuration information.
+                        default:
+                            throw new NotSupportedException("Unexpected node type when parsing codec configuration.");
+                    }
+                }
+            }
+            </example>
+            </summary>        
+        </member>
+        <member name="M:WileyBlack.Dml.IDmlReaderExtension.Identify(System.String)">
+            <summary>
+            Identify() is called when a new association is being constructed and no built-in
+            primitive type supports the type string.  If this extension supports the type, then
+            a non-zero value should be returned that will become the TypeId for the association.
+            If the type string is not supported by this extension, zero should be returned.  TypeId
+            must be non-zero but otherwise can be defined entirely by the extension.  TypeIds need 
+            not be globally unique.
+            </summary>
+            <param name="PrimitiveType">Value of the type attribute for the node.</param>
+            <returns>Non-zero TypeId if supported by this extension.  Zero if not supported.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.IDmlReaderExtension.OpenNode(WileyBlack.Dml.Association,WileyBlack.Platforms.EndianBinaryReader)">
+            <summary>
+            OpenNode() is called when a Read() call is made and the result is a node handled by this extension.  OpenNode()
+            and CloseNode() are always called for an extended primitive node, while GetNode() may not be.  The NodeInfo's
+            TypeId value will match the value provided by a previous Identify() call from this extension.  OpenNode() may 
+            provide any necessary information about the node that a caller may need in order to decide what to do with the
+            node.  For example, when a container node is encountered the name is parsed so that the user can decide of the
+            container's content is of interest.  The entire node may or may not be read to accomodate this, although it is
+            usually preferable to do so in GetNode().  Another example would be an image - OpenNode() might provide the
+            image's width, height, and bits-per-pixel but not provide the actual image until the GetNode() call.  Only a
+            single node will be open at a time.
+            </summary>
+            <seealso>DmlReader.GetExtension()</seealso>
+            <param name="NodeInfo">The node's Association info.  The type parameter may provide further identification
+            for the node.</param>
+            <param name="Reader">Reader providing access to the underlying stream.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.IDmlReaderExtension.GetNode(WileyBlack.Dml.Association,WileyBlack.Platforms.EndianBinaryReader)">
+            <summary>
+            GetNode() is called by the DmlReader.GetExtended() method.  It should parse and return the contents of
+            the current node.  The node head has already been read at the time the GetNode() call is made, but DmlReader 
+            does not prevent multiple calls to GetNode() on the same node (which would typically result in an error.)
+            </summary>
+            <seealso>DmlReader.GetExtended()</seealso>
+            <param name="NodeInfo">Identification information for the node.</param>
+            <param name="Reader">Reader providing access to the underlying stream.</param>
+            <returns>The content of the node in whatever format is suitable to represent the node's data.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.IDmlReaderExtension.CloseNode(WileyBlack.Dml.Association,WileyBlack.Platforms.EndianBinaryReader)">
+            <summary>
+            CloseNode() is called when the user is finished with the extension node and ready to advance to the next 
+            node (this usually occurs in the next Read() call.)  OpenNode() and CloseNode() are always called for an 
+            extended primitive node, while GetNode() may or may not be called between the open and close operations.
+            CloseNode() must determine if the node has already been read, and is responsible for "skipping" the node
+            if it has not.  In some cases this may entail simply reading and discarding the node (i.e. calling
+            GetNode() if it has not been called.)  A more optimal approach actually skips over the node's content.
+            </summary>
+            <param name="NodeInfo">Identification information for the node.</param>
+            <param name="Reader">Reader providing access to the underlying stream.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlHeader.ToTranslation(WileyBlack.Dml.IResourceResolution,WileyBlack.Dml.ParsingOptions)">
+            <summary>
+            Call the ToTranslation() method to interpret the content of the DmlHeader into
+            a DmlTranslation.  An IResourceResolution object may be provided to retrieve dependencies,
+            or null can be provided.  An exception is thrown if any inclusions are encountered and
+            cannot be resolved.
+            </summary>
+            <returns>The DmlTranslation and primitives required by this DML Header.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlHeader.AddTranslationReference(System.String,System.String)">
+            <summary>
+            Call AddTranslationReference() to add a top-level reference to an additional
+            translation document.
+            </summary>
+            <param name="TranslationURI">The URI of the translation document to be referenced.</param>
+            <param name="TranslationURN">Optional URN to provide positive identification of the translation document.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlHeader.AddPrimitiveSet(WileyBlack.Dml.Dom.DomPrimitiveSet)">
+            <summary>
+            Call AddPrimitiveSet() to add a top-level reference to an additional primitive set.  
+            </summary>
+            <param name="ps">The primitive set to reference/include by this header.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Dom.DmlHeader.FromTranslation(WileyBlack.Dml.DmlTranslation,System.Collections.Generic.List{WileyBlack.Dml.Dom.DomPrimitiveSet})">
+            <summary>
+            <para>Call the FromTranslation() method to translate a DmlTranslation object into the DML representation
+            provided by DmlHeader.  Any existing document content is replaced by the translation representation.</para>
+            <para>Note that the representation provided by the FromTranslation() method is machine-generated and
+            may not be the most clear representation of a DML translation.  In particular, any references that
+            were already resolved are not replaced by &lt;Include&gt; directives that can significantly
+            simplify a DML translation document.</para>
+            </summary>
+            <param name="TSL">The DmlTranslation from which to generate this DmlHeader's content.</param>
+            <param name="PrimitiveSets">An optional list of primitive sets to be required by this 
+            DmlHeader.</param>        
+        </member>
+        <member name="P:WileyBlack.Dml.Dom.DmlHeader.Version">
+            <summary>
+            Retrieves or sets the DML:Version value for this document.  If a DML document does not contain
+            this attribute, then the default value is assumed.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.Dom.DmlHeader.ReadVersion">
+            <summary>
+            Retrieves or sets the DML:ReadVersion value for this document.  If a DML document does not contain
+            this attribute, then the DML:Version value is assumed.  DML:ReadVersion specifies the minimum DML format
+            version number required for a reader to process this file correctly.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Dml.Dom.DmlHeader.DocType">
+            <summary>
+            Retrieves or sets the DML:DocType value for this document, which is an informational,
+            human-readable string that a person can use to identify the general document category.
+            Automated identification of a DML document occurs through the combination of the
+            translation and the top-level element, the DocType provides only a backup for diagnostics.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Dom.DmlPadding.Length">
+            <summary>
+            Length gives the total number of bytes encoded in the padding node.  The Length
+            includes the size of the node head, the data size (when present), and the padding
+            bytes (when present).  For single-byte padding nodes Length has a value of 1.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.DmlWriter">
+            <summary>
+            <para>Implements a writer for the Data Markup Language (DML)</para>
+            
+            <para>DmlWriter provides an encoding tool for writing a DML document or fragment.  The DmlWriter provides routines to write
+            the DML document header, containers, attributes, elements, comments, and padding.  Primitive writers are provided that 
+            perform all necessary translation/encoding.  Data writers are also provided.</para>
+            
+            <para>The DmlWriter requires that the caller provide the structure and organization of the DML.  There is no verification
+            against translation or schema in DmlWriter, but a DmlTranslation can be used to retrieve the IDs required for writing.</para>
+            
+            <para>DmlWriter does not require an extension interface to support additional primitives like DmlReader does.  To use additional
+            primitives with DmlWriter, see the WriteStartExtension() methods.</para>
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.AddPrimitiveSet(System.String,System.String)">
+            <summary>
+            Call AddPrimitiveSet() to attempt to enable a primitive set that is required for the DML document to
+            be written.  If a primitive set is not supported, an exception will be thrown.  The AddPrimitiveSet()
+            call does not cause anything to be emitted to the DML stream, it only enables support for the requested
+            primitive codec.
+            </summary>
+            <param name="Set">Primitive set required.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictNodeHeadSize(System.UInt32)">
+            <summary>
+            PredictNodeHeadSize() predicts the encoded size of a node's head.  PredictNodeHeadSize() 
+            assumes that the caller would use WriteStartNode() to write the node.
+            </summary>
+            <param name="ID">The ID which would be written</param>
+            <param name="DataSize">The size of data content which would be written</param>
+            <returns>The exact size, in bytes, required to write the node head using DmlWriter.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictNodeHeadSize(System.String,System.String)">
+            <summary>
+            PredictNodeHeadSize() predicts the encoded size of a node's head when using inline identification.
+            </summary>
+            <param name="Name">The name which would be written.</param>
+            <returns>The exact size, in bytes, required to write the node head using DmlWriter.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictNodeHeadSize(System.String,WileyBlack.Dml.PrimitiveTypes)">
+            <summary>
+            PredictNodeHeadSize() predicts the encoded size of a node's head when using inline identification.
+            </summary>
+            <param name="Name">The name which would be written.</param>
+            <param name="PrimitiveType">A non-array primitive type for the node.</param>
+            <returns>The exact size, in bytes, required to write the node head using DmlWriter.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictNodeHeadSize(System.String,WileyBlack.Dml.PrimitiveTypes,WileyBlack.Dml.ArrayTypes)">
+            <summary>
+            PredictNodeHeadSize() predicts the encoded size of a node's head when using inline identification.
+            </summary>
+            <param name="Name">The name which would be written.</param>
+            <param name="PrimitiveType">A primitive type for the node.</param>
+            <param name="ArrayType">The array type for the node, or ArrayTypes.Unknown if not applicable.</param>
+            <returns>The exact size, in bytes, required to write the node head using DmlWriter.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictContainerHeadSize(System.UInt32)">
+            <summary>
+            PredictContainerHeadSize() predicts the encoded size of a container's head.
+            </summary>
+            <param name="ID">The DMLID of the container to be written.</param>
+            <returns>The exact size, in bytes, required to write the container head using DmlWriter.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictContainerHeadSize(System.String)">
+            <summary>
+            PredictContainerHeadSize() predicts the encoded size of a container's head 
+            when using inline identification.
+            </summary>
+            <param name="Name">The name which would be written.</param>
+            <returns>The exact size, in bytes, required to write the container head using DmlWriter.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.UInt64)">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Int64)">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Boolean)">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.DateTime)">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Single)">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Double)">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Decimal)">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.String)">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Byte[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.UInt16[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.UInt32[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.UInt64[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.SByte[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Int16[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Int32[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Int64[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Single[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Double[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.DateTime[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.String[])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Byte[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.UInt16[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.UInt32[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.UInt64[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.SByte[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Int16[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Int32[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Int64[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Single[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPrimitiveSize(System.Double[0:,0:])">
+            <summary>
+            PredictPrimitiveSize() provides the number of bytes of data that will be required to 
+            encode the primitive's content, not including the node head.
+            </summary>
+            <param name="Value">The value to be represented in the primitive.</param>
+            <returns>The number of bytes of data required to represent the primitive's content in DML encoding.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictCommentSize(System.String)">
+            <summary>
+            PredictCommentSize() provides the number of bytes of data that will be required to 
+            encode the comment's content, not including the node head.
+            </summary>
+            <param name="Value">The text to be placed in the comment.</param>
+            <returns>The number of bytes of data required to represent the comment's content in DML encoding.</returns>        
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.PredictPaddingSize(System.UInt64)">
+            <summary>
+            PredictPaddingSize() provides the number of bytes of data that will be required to 
+            encode the padding's content, not including the node head.  PredictPaddingSize()
+            assumes that a multi-byte padding node will be utilized.  For single-byte padding,
+            the content size is zero.
+            </summary>
+            <param name="Length">The length of padding that would be encoded.</param>
+            <returns>The number of bytes of data required to represent the padding's content in DML encoding.</returns>        
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteStartNode(System.UInt32)">
+            <summary>
+            WriteStartNode() writes the head of a DML node.  It does not write the node's 
+            data.
+            </summary>        
+            <param name="ID">DMLID to write into the node head.</param>        
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteStartNode(System.String,System.String)">
+            <summary>
+            This overload of WriteStartNode() writes the DML node head using inline identification.  
+            The data content is not written.
+            </summary>
+            <param name="Name">Text name of the node.  Must be compatible with XML naming conventions.</param>
+            <param name="Type">Node type.</param>        
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteStartContainer(System.UInt32)">
+            <summary>
+            This overload of WriteStartContainer() writes the container head.  The 
+            data content is not written.
+            </summary>
+            <param name="ID">DMLID of the container.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteStartContainer(System.String)">
+            <summary>
+            This overload of WriteStartContainer() writes the container head using inline
+            identification.  The data content is not written.
+            </summary>
+            <param name="Name">Text name of the element.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteStartContainer(WileyBlack.Dml.Association)">
+            <summary>
+            This overload of WriteStartContainer() writes the container head using the 
+            identification information provided in an Association type.  The data content 
+            is not written.
+            </summary>
+            <param name="Identity">Identification of the element.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteHeader(System.String,System.String,System.String,WileyBlack.Dml.PrimitiveSet[])">
+            <summary>
+            WriteHeader() emits a DML header that references an external translation document.  A header is required
+            on every complete DML document, but can be generated directly using other DmlWriter calls.  WriteHeader() 
+            is a convenience function only.
+            </summary>
+            <param name="TranslationURI">URI providing the DML Translation document for the format.  Can be null.</param>
+            <param name="TranslationURN">URN providing verification of the DML Translation for this content.  Can be null.</param>
+            <param name="DocType">Document type string, usually the same as the name of the document's top-level container.  Can be null.</param>
+            <param name="PrimitiveSets">List of any primitive sets required.  Can be null.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteReservedSpace(System.UInt64)">
+            <summary>
+            WriteReservedSpace() emits a sequence of padding into the stream of length 'ReservedSpace'.
+            In seekable streams, the sequence may be overwritten by DML later, although another WriteReserveSpace()
+            call must be made at the end of the rewrite to "re-reserve" any portion not utilized in
+            the rewrite.
+            </summary>
+            <param name="ReservedSpace">The number of bytes of reserved space to emit.  The node head
+            will be part of the reserved space.  For example, a ReservedSpace value of 1 will result in
+            a single-byte padding node.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteComment(System.String)">
+            <summary>
+            WriteComment() can be used to emit a comment node.
+            </summary>
+            <param name="Text">Text to incorporate into comment.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteStartExtension(System.UInt32)">
+            <summary>
+            Call WriteStartExtension() to write an extended primitive node.  The WriteStartExtension()
+            method writes the node head with the given parameters, then returns an EndianBinaryWriter
+            that can be used to write the node content.
+            </summary>
+            <param name="ID">DMLID of the node.</param>        
+            <returns>An EndianBinaryWriter which can be used to write the node's content.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteStartExtension(System.String,System.String)">
+            <summary>
+            Call WriteStartExtension() to write an extended primitive node.  The WriteStartExtension()
+            method writes the node head with the given parameters, then returns an EndianBinaryWriter
+            that can be used to write the node content.  This overload generates an inline identification
+            node.
+            </summary>
+            <param name="Name">XML-Compatible name of the node.</param>
+            <param name="NodeType">Type string identifying the node primitive.</param>        
+            <returns>An EndianBinaryWriter which can be used to write the node's content.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteStartEncryptedDml(System.Byte[],System.Boolean)">
+            <summary>
+            WriteStartEncryptedDml() begins the writing and AES encryption of a DML fragment.
+            The WriteStartEncryptedDml() method returns a DmlWriter which accepts ordinary 
+            writing of DML but writes it to an encryptor which is fed into this DmlWriter.  In
+            this way, DML can be encrypted in an as-you-go method which does not require
+            retaining the encrypted message in memory before writing it to the underlying
+            stream.  The WriteEndEncryptedDml() method must be called to terminate the
+            encryption node.  
+            </summary>
+            <param name="Key">Secret encryption key.  Can be 128, 192, or 256 bits in length.</param>
+            <param name="AttachHMAC">True to calculate and attach an authentication code to the message.  False to omit.</param>
+            <returns>A DmlWriter which will output encrypted content to the node.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteEndEncryptedDml(WileyBlack.Dml.DmlWriter)">
+            <summary>
+            Call WriteEndEncryptedDml() to terminate an encrypted DML node started with an earlier
+            WriteStartEncryptedDml() call.
+            </summary>
+            <param name="EncryptedWriter">The DmlWriter provided by a previous WriteStartEncrypedDml()
+            call.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteEncryptedDml(System.IO.Stream,System.Byte[],System.Byte[])">
+            <summary>
+            WriteEncryptedDml() writes an encrypted node out in its entirety.  This overload
+            requires that the encrypted message be provided from a stream, usually in-memory.
+            The initialization vector must be provided.  An HMAC-384 code can be provided.
+            </summary>
+            <seealso>WriteStartEncryptedDml(), WriteEndEncryptedDml()</seealso>
+            <param name="EncryptedMessage">The encrypted message, including block count markers
+            and the terminating empty count.</param>
+            <param name="IV">Initialization vector</param>
+            <param name="HMAC384">HMAC-384 Authentication Code, or null.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteStartCompressedDml(System.Boolean)">
+            <summary>
+            WriteStartCompressedDml() begins the writing and compression of a DML fragment.
+            The WriteStartCompressedDml() method returns a DmlWriter which accepts ordinary 
+            writing of DML but writes it to a compressor which is fed into this DmlWriter.  In
+            this way, DML can be compressed in an as-you-go method which does not require
+            retaining the compressed message in memory before writing it to the underlying
+            stream.  The WriteEndCompressedDml() method must be called to terminate the
+            compressed node.  
+            </summary>                
+            <param name="AttachCRC32">True to calculate and attach a verification code to the message.  False to omit.</param>
+            <returns>A DmlWriter which will output compressed content to the node.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteEndCompressedDml(WileyBlack.Dml.DmlWriter)">
+            <summary>
+            Call WriteEndCompressedDml() to terminate a compressed DML node started with an earlier
+            WriteStartCompressedDml() call.
+            </summary>
+            <param name="CompressedWriter">The DmlWriter provided by a previous WriteStartCompressedDml()
+            call.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.DmlWriter.WriteCompressedDml(System.IO.Stream,System.Byte[])">
+            <summary>
+            WriteCompressedDml() writes a compressed node out in its entirety.  This overload
+            requires that the compressed data be provided from a stream, usually in-memory.
+            A CRC-32 code can be provided.
+            </summary>
+            <seealso>WriteStartCompressedDml(), WriteEndCompressedDml()</seealso>
+            <param name="CompressedDml">The compressed message (DEFLATE stream), including block 
+            headers.</param>
+            <param name="Crc32">CRC-32 Code, or null.  If provided, the CRC-32 code should be
+            calculated from the decompressed form of the dml.</param>
+        </member>
+        <member name="T:WileyBlack.Dml.DmlWriter.EncMessageStream">
+            <summary>
+            EncMessageStream writes the "Encrypted Message" format utilized in DML-EC's encrypted
+            nodes.  It provides a buffer layer which will write the block count values out when
+            a certain threshold is reached.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.Serialization.DmlIgnoreAttribute">
+            <summary>
+            The DmlIgnore attribute can be applied to a property or field to indicate that it should
+            not be serialized or deserialized even if it is a public property or field.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.Serialization.DmlOptionalAttribute">
+            <summary>
+            The DmlOptional attribute can be applied to a property or field to indicate that the node
+            can be omitted when the property or field is null.  The DmlOptional attribute cannot be
+            used with dml array elements, although arrays themselves can be optional.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Serialization.DmlArrayItemAttribute.DMLID">
+            <summary>
+            Since the DmlElementAttribute can be applied to type definitions or to fields/properties,
+            the type definition can provide enough information to identify and instantiate the
+            type.  The DMLID value in DmlArrayItem then is used only to override this recognition
+            and is not required if the type definition contains a DmlElementAttribute.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Serialization.DmlArrayItemAttribute.XMLName">
+            <summary>
+            Since the DmlElementAttribute can be applied to type definitions or to fields/properties,
+            the type definition can provide enough information to identify and instantiate the
+            type.  The XMLName value in DmlArrayItem then is used only to override this recognition
+            and is not required if the type definition contains a DmlElementAttribute.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.Serialization.DmlRootAttribute">
+            <summary>
+            <para>The DmlRoot attribute can be applied to any class or struct in order to denote it as a possible
+            root container in a Dml tree.  The DmlRoot attribute acts like the DmlElement attribute except that it
+            can also specify a translation URI.  Classes with the DmlRoot attribute are still eligible to be utilized 
+            as a subordinate element within DML documents, but their use will trigger the inclusion of the specified 
+            translation URI in a generated translation document.</para>
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.Serialization.DmlPrimitiveSetAttribute">
+            <summary>
+            <para>In most cases, the Dml Serialization system will automatically detect required
+            primitive sets.  However if a custom serialization is being performed, any required
+            primitive sets should be marked on the class in an attribute.</para>
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Dml.Serialization.IDmlSerializable">
+            <summary>
+            The IDmlSerializable interface can be declared on a type in order to provide custom serialization logic whenever
+            that type is encountered.  Either a DmlRoot or DmlElement attribute must be attached to any type that will be 
+            serialized using IDmlSerializable or to the field containing the type.  The association will be merged with the 
+            translation generated for serialization.  When deserializing, any valid encounters of the DMLID (or name, if using
+            inline identification) for the type will lead to instantiation of an object followed by a ReadDml() call.  
+            When serializing, WriteDml() will be called wherever the object is encountered.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Serialization.IDmlSerializable.ReadDml(WileyBlack.Dml.DmlReader)">
+            <summary>
+            The ReadDml() method must reconstitute the object from the DML provided.  When ReadDml() is called,
+            the reader will have completed the Read() call on the node matching the identification of this
+            type.  That is, the opening node of the type will have already been read.  When this method returns, it 
+            must have read the entire element from beginning to end, including any associated EndContainer marker.
+            <example>
+            void ReadDml(DmlReader reader) {
+                for (; ; ) {
+                    if (!reader.Read()) throw new EndOfStreamException("Dml stream unexpectedly terminated.");
+                    if (reader.NodeType == NodeTypes.EndContainer) return;
+                    // We'll allow either attribute or element formats in this example, but could also check.
+                    switch (reader.Name.ToLower())
+                    {
+                    case "width": Width = reader.GetAsInt(); break;
+                    case "height": Height = reader.GetAsInt(); break;
+                    }
+                }
+            }    
+            </example>
+            </summary>
+            <param name="reader">The reader providing access to the DML stream.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Serialization.IDmlSerializable.WriteDml(WileyBlack.Dml.DmlWriter)">
+            <summary>
+            The WriteDml() method should serialize the DML representation of the object.  When WriteDml() is called,
+            the writer will have made the WriteStartContainer() call for the type.  WriteDml() is responsible for
+            writing all attributes, elements, and markers for the container (including the WriteEndContainer()
+            call.)  
+            <example>
+            public void WriteDml(DmlWriter writer)
+            {    
+                writer.Write(DML3Translation.idDMLContentSize, PredictedSize);
+                writer.Write("Width", (uint)Width);
+                writer.Write("Height", (uint)Height);
+                writer.WriteEndAttributes();
+                
+                foreach (...) 
+                {
+                    writer.WriteStartContainer("SubElement");
+                    ((IDmlSerializable)[subelement]).WriteDml(writer);
+                }
+                
+                writer.WriteEndContainer();
+            }
+            </example>
+            </summary>
+            <param name="writer">The writer providing access to the DML stream.</param>        
+        </member>
+        <member name="M:WileyBlack.Dml.Serialization.IDmlSerializable.GetContentSize">
+             <summary>
+             The GetContentSize() method can provide the size of the DML representation of the object.  The size should
+             exclude the node head, but include all attributes, elements, and end markers.  The GetContentSize() method can
+             return UInt64.MaxValue if the size cannot be predicted at this time.  GetContentSize() is used to provide
+             the DML:ContentSize value for higher-level containers.
+             <example>
+             public void GetContentSize()
+             {    
+                 UInt64 size = 0;        
+                 size += DmlWriter.PredictNodeHeadSize(DML3Translation.idDMLContentSize, PrimitiveTypes.UInt);
+                 size += DmlWriter.PredictPrimitiveSize(PredictedSize);
+                 size += DmlWriter.PredictNodeHeadSize("Width", PrimitiveTypes.UInt);
+                 size += DmlWriter.PredictPrimitiveSize(Width);
+                 size += DmlWriter.PredictNodeHeadSize("Height", PrimitiveTypes.UInt);
+                 size += DmlWriter.PredictPrimitiveSize(Height);
+                 size ++;                // EndAttributes marker is always 1 byte.        
+                 
+                 foreach (...) 
+                 {
+                     size += DmlWriter.PredictContainerHeadSize(DMLID_MySubElement);
+                     size += ((IDmlSerializable)[subelement]).GetSize();
+                 }
+            
+                 size ++;                // EndContainer marker is always 1 byte.
+                 return size;
+             }
+             </example>
+             </summary>
+        </member>
+        <member name="M:WileyBlack.Dml.Serialization.DmlSerializer.Scan(System.Type,WileyBlack.Dml.Serialization.DmlSerializer.AttachInfo)">
+            <summary>
+            Scan() provides the primary heirarchial examination of types in preparation
+            for serialization and deserialization.  The Scan() method is recursive, with
+            the AI argument providing the necessary connection between the type being
+            scanned and its attachment to the type heirarchy.  The top-level scan is
+            initiated by provided an AI of null, which leads to some special cases.
+            </summary>
+            <param name="type">The type heirarchy to be scanned.</param>
+            <param name="AI">Reflection information about the connection to the
+            heirarchy.  Null at the top-level scan.</param>        
+            <returns>Scan information contained in an SNode type which should
+            be attached to the scan information heirarchy.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.Serialization.DmlSerializer.Serialize(System.IO.Stream,System.Object)">
+            <summary>
+            The Serialize() method serializes the type as the top-level of a DML format stream.  A DML header
+            is generated, and the object is serialized to the top-level container of the DML stream.
+            </summary>
+            <param name="stream">The stream to serialize the DML document to.</param>
+            <param name="obj">The object to serialize.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Serialization.DmlSerializer.SerializeContent(WileyBlack.Dml.DmlWriter,System.Object)">
+            <summary>
+            The SerializeContent() method serializes the type as part of a larger DML sequence.  The DmlWriter must
+            already be initialized and the DML Header must have already been written.  Optionally, the call can be
+            made to generate a container within a larger DML context.
+            </summary>
+            <param name="Writer">The DmlWriter to write the object to.</param>
+            <param name="obj">The object to be serialized.</param>
+        </member>
+        <member name="M:WileyBlack.Dml.Serialization.DmlSerializer.Deserialize(System.IO.Stream)">
+            <summary>
+            The Deserialize() method generates an in-memory object from the top-level element of a DML
+            formatted stream.
+            </summary>
+            <param name="stream">The stream to deserialize the object from.</param>
+            <returns>An object generated from the DML stream's top-level content.</returns>
+        </member>
+        <member name="M:WileyBlack.Dml.Serialization.DmlSerializer.DeserializeContent(WileyBlack.Dml.DmlReader)">
+            <summary>
+            The DeserializeContent() method performs deserialization of a type embedded within a larger DML
+            sequence.  DeserializeContent() must be called after the matching type has been identified
+            by a Read() call on the DmlReader, but before the type has been read.  The reader must possess
+            a global translation which includes all necessary associations for successful deserialization.
+            </summary>
+            <param name="Reader"></param>
+            <returns></returns>
+        </member>
+        <member name="P:WileyBlack.Dml.Serialization.DmlSerializer.GlobalTranslation">
+            <summary>
+            GlobalTranslation returns the DmlTranslation generated at construction.  The
+            GenerateTranslation option should be turned on during construction in order
+            to assign all associations a DMLID that do not have one.  The generated 
+            translation is machine-generated and may not provide the most clear 
+            representation of the translation.  All references in the translation are 
+            resolved (there are no %lt;Include%gt; references) and no ancillary
+            markup such as the InformationURI or XMLRoot.  However, the generated
+            translation can provide a starting point for creating a formal translation
+            document.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Serialization.DmlSerializer.Options.LittleEndian">
+            <summary>
+            The encoding of DML structure is endian-neutral, but additional primitives can be enabled which
+            can use either little or big-endian representation for arrays and matrices.  By default,
+            the current machine architecture's endianness is used.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Serialization.DmlSerializer.Options.GenerateTranslation">
+            <summary>
+            The GenerateTranslation option controls handling of DML associations for which no DMLID is provided.
+            If false, inline identification is used.  If true, then DMLIDs are assigned.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Dml.Serialization.DmlSerializer.SNode.Optional">
+            <summary>
+            If Optional is true, then null values for the node are allowed.  This is configured
+            by the DmlOptional attribute.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Utility.CRC32">
+            <summary>
+            Computes the CRC-32 of a given buffer.  An example of usage:
+            
+            <code>
+            CRC32 CrcAlg = CRC32.CreateCastagnoli();
+            using (FileStream fs = File.Open("Example.dat", FileMode.Open))
+            {
+                byte[] buffer = new byte [65536];    
+                CrcAlg.Initialize();
+                int nRead = fs.Read(buffer, 0, buffer.Length);
+                if (nRead == 0) break;
+                CrcAlg.HashCore(buffer, 0, nRead);
+            }
+            Console.WriteLine("CRC-32C= {0:X}", CrcAlg.Result);
+            </code>
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Utility.CRC32.Initialize">
+            <summary>
+            Initialize() resets the Result value to begin a new data sequence.  To compute a CRC-32,
+            first call Initialize(), then call HashCore() repeatedly on the data sequence.  When
+            all of the data sequence has been fed to HashCore(), retrieve Result for the CRC value.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Utility.CRC32.HashCore(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            HashCore() computes a CRC-32, continuing from any previous calculation since the last
+            Initialize() call.  The result is returned and available from the Result property or HashFinal()
+            method.
+            </summary>
+            <param name="block">Block of data to compute the CRC over.</param>
+            <param name="offset">Offset into Block to begin computation.</param>
+            <param name="count">Number of bytes from Block to compute over.</param>
+            <returns>The CRC-32 computed since the last Start() call.</returns>
+        </member>
+        <member name="P:WileyBlack.Utility.CRC32.Result">
+            <summary>
+            Result gives the resulting CRC-32 value computed from the Continue() function.  Call
+            the Start() function to reset the CRC-32 value for a new computation.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Platforms.LSBBitStream">
+            <summary>
+            LSBBitStream provides a Stream which also supports bitwise read operations.  That is,
+            individual bits can be read from the stream, or segments less than 8-bits in width.
+            The LSBBitStream provides a small buffer which facilitates this, since underlying
+            stream access must always be bytewise.  
+            
+            The LSBBitStream class supports reading only in LSB-first-order.  That is, the first 
+            bit read is taken from the least-significant of the 8-bits of the first byte.  This
+            is the directionality used by DEFLATE, but may not always be the case.  Note that
+            this is not the same as endianness, which specifies the sequencing of bytes within
+            a multibyte value.
+            
+            The LSBBitStream class provides read-support only at this time.  A writable implementation
+            is possible but is not provided.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Platforms.HistoryRingBuffer`1">
+            <summary>
+            The HistoryRingBuffer class is used by DeflateStreamEx in order to accomodate the
+            history buffer which is required for DEFLATE unpacking.  The buffer provides
+            a fixed-size memory window of the most recent unpacked data.  
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:WileyBlack.Platforms.HistoryRingBuffer`1.GetHistory(System.Int64)">
+            <summary>
+            GetHistory() retrieves the Nth-from-last element in the ring buffer.  For example,
+            calling Add(1), Add(2), and Add(3) on a new buffer results in the buffer containing
+            the entries 1, 2, and 3.  Calling GetHistory(1) returns 3.  Calling GetHistory(3)
+            returns 1.  Calling GetHistory(0) or with a distance greater than the buffer's
+            length result in an exception.
+            </summary>
+            <param name="nDistance">Distance in history of element to retrieve.  Must be greater
+            than zero and less than or equal to Length.</param>
+            <returns>The value of the element.</returns>
+        </member>
+        <member name="T:WileyBlack.Platforms.DeflateStreamEx">
+            <summary>
+            DeflateStreamEx decompresses a stream which was compressed using the
+            DEFLATE algorithm.  It is very similar to the .NET built-in DeflateStream
+            class except that it only performs decompression.  The built-in DeflateStream
+            class will read to the end of a stream whenever used and will not indicate
+            the location where reading ended.  The DeflateStreamEx class does not have
+            this limitation and can be used with DML.  Significant optimization is
+            possible and needed for the DeflateStreamEx class.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Platforms.DeflateStreamEx.History">
+            <summary>
+            The DEFLATE compression technique supports distance codes whereby
+            an instruction tells the decoder to look back in history and repeat
+            something that was previously decompressed.  The HistoryRingBuffer
+            facilitates this.  History in DEFLATE can cross block boundaries,
+            but the largest distance code allowed is 32768.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Platforms.DeflateStreamEx.QueuedHistory">
+            <summary>
+            When more than one byte is decoded in a single operation, we have to store the
+            extra bytes somewhere (assuming we are reading a byte at a time).  We already
+            have to maintain 'History' in order to facilitate backward string copies that
+            are a cornerstone of deflate's compression mechanism.  When QueuedHistory is
+            greater than zero, it indicates a number of bytes which are stored in History 
+            but have not yet been returned from the DeflateStreamEx.  QueuedHistory should 
+            never exceed 258 bytes based on deflate rules.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Platforms.DeflateStreamEx.Huffman.CLCount">
+            <summary>
+            The CLCount array gives the number of codes sharing a common bit-length.  For example,
+            CLCount[3] gives the number of symbols which are represented by 3-bit codes.  CLCount[0]
+            gives the number of symbols which have no code.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Platforms.DeflateStreamEx.Huffman.UnusedSymbols">
+            <summary>
+            UnusedSymbols gives the number of symbols which have no code.  These symbols do not
+            appear in the decompressed data and therefore do not require a code representation.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Platforms.DeflateStreamEx.Huffman.UnusedCodes">
+            <summary>
+            UnusedCodes gives the number of codes which are not assigned to a symbol.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Platforms.DeflateStreamEx.Huffman.Init(System.UInt32[])">
+            <summary>
+            Performs the transformation described in RFC 1951 Section 3.2.2.  
+            </summary>
+            <param name="CodeLength">The length, in bits, of each code.  A zero value indicates
+            a symbol which will not be used.  The indices of this array correspond to the
+            symbols being represented.</param>
+            <returns></returns>
+        </member>
+        <member name="F:WileyBlack.Platforms.EndianBinaryReader.LittleEndian">
+            <summary>
+            LittleEndian indicates if the underlying stream is represented in
+            little-endian (true) or big-endian (false) format.  All Read..()
+            functions in EndianBinaryReader which read more than 1 byte utilize
+            LittleEndian to determine the sequencing expected from the stream.
+            LittleEndian can be changed at any time to alter the sequencing applied.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryReader.ReadLargeUI(System.Int32)">
+            <summary>
+            ReadLargeUI() reads an arbitrary length unsigned value from the underlying
+            stream, compensating for the endianness of the stream as needed.  See ReadUI()
+            for values up to 64-bits.  ReadLargeUI() performs the operation on values
+            of arbitrary length beyond 64-bits, but it must still be a multiple of 8-bits.
+            </summary>
+            <seealso>ReadUI()</seealso>
+            <param name="nBytes">The number of bytes representing the value in
+            the underlying stream.</param>
+            <returns>An unsigned bytewise representation of the value read from the
+            stream.</returns>
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryReader.ReadUI(System.Int32)">
+            <summary>
+            ReadUI() reads an arbitrary length (up to 64-bits) unsigned value 
+            from the underlying stream, compensating for the endianness of the 
+            stream as needed.
+            </summary>
+            <seealso>ReadLargeUI()</seealso>
+            <param name="nBytes">The number of bytes representing the value in
+            the underlying stream.</param>
+            <returns>An unsigned 64-bit representation of the value read from the
+            stream.</returns>
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryReader.ReadInt24">
+            <summary>
+            ReadInt24() reads a signed 24-bit value from the stream.  The
+            value is sign-extended to be properly represented in the 32-bit
+            return value.
+            </summary>
+            <returns>A 32-bit representation of the 24-bit stream value</returns>
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryReader.ReadI(System.Int32)">
+            <summary>
+            ReadI() reads in an arbitrary length (up to 64-bit) signed integer
+            from the stream.  ReadI() assumes that the value is stored in 2s
+            compliment notation (the most commonly used method for storing
+            signed values in computers).  ReadI() will sign-extend the value
+            so that it is properly signed in the returned value.
+            </summary>
+            <param name="nBytes">The number of bytes representing the signed
+            integer in the underlying stream.</param>
+            <returns>A signed 64-bit value representation of the value.</returns>
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryReader.ReadUInt16(System.Int32)">
+            Optimization: These readers could afford to be optimized *
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryReader.ReadInt24(System.Int32)">
+            <summary>
+            ReadInt24(Count) reads a signed 24-bit array from the stream.  The
+            values are sign-extended to be properly represented in the 32-bit
+            return value.
+            </summary>
+            <returns>A 32-bit representation of the 24-bit stream array</returns>
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryReader.ReadByte(System.Int32,System.Int32)">
+            Optimization: These readers could really use optimization.  They really need an unsafe
+            context or a DLL to be efficient. *
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryReader.ReadInt24(System.Int32,System.Int32)">
+            <summary>
+            ReadInt24(Count) reads a signed 24-bit array from the stream.  The
+            values are sign-extended to be properly represented in the 32-bit
+            return value.
+            </summary>
+            <returns>A 32-bit representation of the 24-bit stream array</returns>
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryWriter.WriteUI(System.UInt64,System.Int32)">
+            <summary>
+            WriteUI() writes a value with only a specified number of bytes
+            of outputs, always the least-significant bytes.  This can be used
+            to write a truncated form of the value.  Although the function
+            accepts an unsigned integer, in this case there is no difference
+            between signed and unsigned and a signed value can be accepted as
+            well.
+            </summary>
+            <param name="val">Value (or partial value) to be written</param>
+            <param name="bytes">Least-significant number of bytes of Value to write</param>
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryWriter.WriteLargeUI(System.Byte[])">
+            <summary>
+            WriteLargeUI() provides behavior similar to WriteUI(), but supports
+            values of an arbitrary length (beyond 64-bits).  WriteLargeUI() swaps
+            the byte-order of the value if the stream's byte-order does not match
+            the current architecture byte-order.  Otherwise it writes the Value
+            directly.        
+            </summary>
+            <param name="val">Value to be written</param>        
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryWriter.WriteRaw(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            WriteRaw() will write a block without any endian conversion applied.
+            It is a "pass-through" write.
+            </summary>
+            <param name="buffer">Buffer to be written</param>
+            <param name="index">First index to be written</param>
+            <param name="count">Number of bytes to write</param>
+        </member>
+        <member name="M:WileyBlack.Platforms.EndianBinaryWriter.Write(System.Byte[0:,0:])">
+            Optimization continues to be important in EndianBinaryWriter, and this is another great
+            example of a good place for it.  The matrices happen to be linear in memory already,
+            so we are working really hard here in order to accomplish what could be accomplished
+            quickly and easily. 
+        </member>
+        <member name="T:WileyBlack.Utility.StreamFragment">
+            <summary>
+            StreamFragment is a stream which references a larger stream and provides streaming
+            access to a subsection of that larger stream.  For instance, if a MemoryStream
+            is used to represent 3 files in memory with known boundaries between the three files,
+            then a StreamFragment could be used to provide a Stream that represents just one
+            of the 3 files by setting it up to reference bytes N..M of the larger stream.
+            </summary>
+        </member>
+        <member name="F:WileyBlack.Utility.StreamFragment.m_Position">
+            <summary>
+            In case Position is not available, we still need to keep track of how many bytes have
+            been consumed.  m_Position represents the current location within the StreamFragment,
+            not the BaseStream's position.  m_Position is not used when BaseStream.CanSeek is true
+            because the caller may have circumvented the StreamFragment's seek - it is better to
+            use the Position call in this case.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Utility.StreamFragment.#ctor(System.IO.Stream,System.UInt64)">
+            <summary>
+            Constructs a StreamFragment object where the fragment begins at
+            the current location within BaseStream and continues for FragmentLength
+            bytes.
+            </summary>
+            <param name="BaseStream">The BaseStream from which the fragment stream will read.</param>
+            <param name="FragmentLength">The length of the fragment within the base stream, in bytes.</param>
+        </member>
+        <member name="M:WileyBlack.Utility.StreamFragment.#ctor(System.IO.Stream,System.UInt64,System.UInt64)">
+            <summary>
+            Constructs a StreamFragment object within a base stream.  This overload
+            requires a BaseStream which supports seeking, and allows defining the
+            fragment as arbitrary locations within the base stream.  
+            </summary>
+            <param name="BaseStream">The BaseStream from which the fragment stream will read.</param>
+            <param name="FragmentOffset">The location of the first byte of the fragment within the BaseStream.</param>
+            <param name="FragmentLength">The length of the fragment within the base stream, in bytes.</param>
+        </member>
+        <member name="P:WileyBlack.Utility.StreamFragment.Remaining">
+            <summary>
+            Remaining returns the number of bytes remaining in the current stream
+            fragment.  In the case of a stream which supports seeking, this 
+            calculation includes any seeks which have been performed on the stream.
+            If seeking operations on the base stream have moved the position out of
+            the stream fragment, this value can be negative.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Utility.StreamFragment.IsAtEnd">
+            <summary>
+            IsAtEnd returns true only if the current position of the stream is
+            exactly past the end of stream.  In the case of a stream which supports
+            seeking, this includes verifying that the base stream is positioned
+            just past this fragment.
+            </summary>
+        </member>
+        <member name="T:WileyBlack.Utility.StreamWithHash">
+            <summary>
+            StreamWithHash provides a hash algorithm calculation on all data passing through
+            a stream.  The StreamWithHash class prohibits seeking on the stream even if the
+            base stream supports seeking, but reading and writing are supported if the base
+            stream supports them.  Once all data is read or written from/to the stream, call
+            Hash to retrieve the calculated hash code.  Calling Hash closes the stream if
+            it is not already closed.  Closing or disposing the StreamWithHash does not
+            affect the base stream.
+            </summary>
+        </member>
+        <member name="M:WileyBlack.Utility.StreamWithHash.#ctor(System.IO.Stream,System.Security.Cryptography.HashAlgorithm)">
+            <summary>
+            Constructs a StreamWithCRC32 object that will calculate the CRC-32
+            from data read or written on the stream.
+            </summary>
+            <param name="BaseStream">The BaseStream from which the fragment stream will read.</param>        
+        </member>
+        <member name="M:WileyBlack.Utility.StreamWithHash.ReadAll">
+            <summary>
+            The ReadAll() is called in order to force the entire remaining stream to be
+            read.  This must be done before the Hash can be retrieved.  If the user has
+            already retrieved the entire stream, this function has no effect.
+            </summary>
+        </member>
+        <member name="P:WileyBlack.Utility.StreamWithHash.Hash">
+            <summary>
+            Hash retrieves the final hash code for all data read or written from/to the
+            stream.  Hash closes the stream if it is not already closed.
+            </summary>
+        </member>
+    </members>
+</doc>

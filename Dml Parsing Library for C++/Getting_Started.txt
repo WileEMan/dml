@@ -1,0 +1,14 @@
+To access the Dml Parsing Library:
+  1. Add the Dml Parsing Library for C++ folder to your include file path.
+  2. In one compilation unit (such as StdAfx.cpp or Main.cpp), add the following two lines:
+
+	#define PrimaryModule
+	#include "Dml.h"
+
+  3. In all other compilation units, add the following one line:
+
+	#include "Dml.h"
+
+That's it, at least to get you connected!
+
+See Samples for C++ examples of use.

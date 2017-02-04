@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dml for C++ demo", "Dml for C++ demo.vcxproj", "{082EFCE9-C118-4711-A87B-4532B35A8C40}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug with STL|Win32 = Debug with STL|Win32
+		Debug with STL|x64 = Debug with STL|x64
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release with STL|Win32 = Release with STL|Win32
+		Release with STL|x64 = Release with STL|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Debug with STL|Win32.ActiveCfg = Debug with STL|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Debug with STL|Win32.Build.0 = Debug with STL|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Debug with STL|x64.ActiveCfg = Debug with STL|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Debug|Win32.ActiveCfg = Debug|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Debug|Win32.Build.0 = Debug|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Debug|x64.ActiveCfg = Debug|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Release with STL|Win32.ActiveCfg = Release with STL|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Release with STL|Win32.Build.0 = Release with STL|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Release with STL|x64.ActiveCfg = Release with STL|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Release|Win32.ActiveCfg = Release|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Release|Win32.Build.0 = Release|Win32
+		{082EFCE9-C118-4711-A87B-4532B35A8C40}.Release|x64.ActiveCfg = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
