@@ -11,6 +11,9 @@ namespace wb
 {
 	//using namespace std;
 
+	using std::vector;			// Make wb::vector an identical alias for std::vector.
+
+	/*
 	template < class T, class Alloc = std::allocator<T> > class vector : public std::vector<T,Alloc>	
 	{ 
 		typedef std::vector<T,Alloc> base;
@@ -26,6 +29,7 @@ namespace wb
 			const allocator_type& alloc = allocator_type()) : base(first, last, alloc) { }
 		vector (const vector& x) : base(x) { }
 	};
+	*/
 }
 #else
 

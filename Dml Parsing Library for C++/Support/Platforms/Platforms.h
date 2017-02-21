@@ -219,6 +219,14 @@ namespace wb
 	inline Int64	Round64(double dVal){ return (fmod(dVal, 1.0) >= 0.5) ? (((Int64)dVal) + 1) : ((Int64)dVal); }	
 }
 
+	/** Emulate log2() for Visual C++ versions below 2013 **/
+#if defined(_MSC_VER) && _MSC_VER < 1800
+#include <Math.h>
+
+#undef log2
+inline double log2( double n ) { return log( n ) / log( (double)2.0 ); }
+#endif
+
 #endif	// __WbPlatform_h__
 
 //	End of Platform.h

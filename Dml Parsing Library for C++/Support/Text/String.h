@@ -233,7 +233,7 @@ namespace wb
 		
 		basic_string<Elem>& operator+=(const Elem* s)
 		{
-			int nAdd = szlen(s);
+			size_t nAdd = szlen(s);
 			Reallocate(m_nLength + nAdd);
 			memcpy(m_pData + m_nLength, s, nAdd * sizeof(Elem));
 			m_nLength += nAdd;
@@ -429,7 +429,7 @@ namespace wb
 	};
 
 	/** basic_string<Elem> operator+ implementations (full copies) **/
-
+	 
 	template<class Elem> inline basic_string<Elem> operator+ (const basic_string<Elem>& lhs, const basic_string<Elem>& rhs)
 	{
 		basic_string<Elem> ret;
@@ -448,7 +448,7 @@ namespace wb
 
 	template<class Elem> inline basic_string<Elem> operator+ (const basic_string<Elem>& lhs, const Elem*   rhs)
 	{
-		int nRhsLength = basic_string<Elem>::szlen(rhs);
+		size_t nRhsLength = basic_string<Elem>::szlen(rhs);
 		basic_string<Elem> ret;
 		size_t nLength = lhs.m_nLength + nRhsLength;
 		ret.reserve(nLength);		

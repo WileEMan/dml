@@ -29,8 +29,8 @@
 #ifdef UseSTL
 #include <stdexcept>
 #endif
-#include "Platforms.h"
-#include "String.h"
+#include "Platforms/Platforms.h"
+#include "Text/String.h"
 #include "Text/Encoding.h"
 
 #ifdef _WINDOWS
@@ -70,7 +70,7 @@ namespace wb
 	{
 	protected:
 		// Although the Microsoft implementation of std::exception includes a message,
-		// this allows portability.  Also, may not be in UseSTL mode.
+		// this allows portability.  Also, we may not be compiling in UseSTL mode.
 		string Message;
 
 		#if 0

@@ -41,7 +41,7 @@ namespace wb
 			static UTF8Encoding UTF8;
 		};	
 
-		class UTF8Encoding : Encoding
+		class UTF8Encoding : public Encoding
 		{
 		public:		
 			uint GetCodePage() const override { return 65001; }

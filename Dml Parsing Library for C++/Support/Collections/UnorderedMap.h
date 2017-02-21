@@ -114,8 +114,10 @@ namespace wb
 
 		void Reallocate(size_type new_bucket_count)
 		{
+			assert (fmod(log2((double)new_bucket_count),1.0) < 1.0e-4);				// Must request a power-of-two for new_bucket_count.
+
 				// To ask for 32 buckets, we need a mask of 11111b (0x1F, 31)...
-			hash_type new_mask = (new_bucket_count - 1);
+			hash_type new_mask = (hash_type)(new_bucket_count - 1);
 			if (new_mask == 0) new_mask = 1;
 			if (new_mask <= current_mask) return;
 

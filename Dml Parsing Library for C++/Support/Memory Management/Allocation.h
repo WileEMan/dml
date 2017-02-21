@@ -63,14 +63,23 @@ namespace wb
 
 	namespace memory
 	{
-		/** r_ptr is very similar to the unique_ptr class offered by STL, but accepts optional responsibility for an object.  The
-			r_ptr can accept either a reference (non-responsible) or a pointer (responsible for cleanup) and store it for access.
-
-			TODO: A more clear method would probably be to force the caller to wrap the parameter.  For example, only accept a
-			parameter that is wrapped in a "Reference<type>" object or a type&& object.  The first (Reference) will make a copy
-			of the reference and assume no responsibility.  The second (std::move) will assume ownership of the object.  Either
-			way the caller has to make a conscious decision.
-		**/
+		/// <summary>Responsibility-Pointer (r_ptr) is very similar to the unique_ptr class offered by STL, but can accept and 
+		/// wrap a pointer with or without taking responsibility for freeing its memory.  An r_ptr object can only be 
+		/// moved to another pointer, not copied.  Initialization of an r_ptr requires use of either the responsible() or
+		/// absolved() call.  The use patterns for r_ptr look like:
+		/// <example>
+		///	r_ptr&lt;Object&gt; owned_object_ptr = r_ptr&lt;Object&gt;::responsible(new Object(...));		// Initializes object_ptr and takes responsibility for deletion.
+		///
+		/// Object* pGivenPtr = ...;
+		/// r_ptr&lt;Object&gt; object_ptr = r_ptr&lt;Object&gt;::absolved(pGivenPtr);						// Initializes object_ptr but does not assume responsibility for deletion.
+		///
+		///	ToAnotherFunction(std::move(object_ptr));														// Calls a function taking a single r_ptr&lt;Object&gt;&& parameter.  Transfers object_ptr to that function.
+		///	// object_ptr has now been moved into another r_ptr and use here would result in a null pointer exception.
+		///
+		/// ToAnotherFunction(r_ptr&lt;Object&gt;::absolved(owned_object_ptr));								// Passes an absolved copy of owned_object_ptr to a function.  
+		/// // owned_object_ptr is still valid and deletion of the Object will only occur after owned_object_ptr passes out of scope.
+		/// </example>
+		///	</summary>
 		template<typename T, class AllocatorType = allocator<T>> class r_ptr
 		{
 			typedef T*		pointer;
@@ -119,6 +128,14 @@ namespace wb
 			{
 				m_pObj = x.m_pObj; x.m_pObj = nullptr;
 				m_bResponsible = x.m_bResponsible; x.m_bResponsible = false;
+			}
+
+			r_ptr& operator= (std::nullptr_t)
+			{ 
+				if (m_bResponsible && m_pObj != nullptr) TheAllocator.destroy(m_pObj); //delete m_pObj;
+				m_pObj = nullptr; 
+				m_bResponsible = false; 
+				return *this;
 			}
 
 			r_ptr& operator= (r_ptr&& x) 
