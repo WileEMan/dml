@@ -47,7 +47,7 @@ namespace wb
 			BinaryWriter(memory::r_ptr<Stream>&& Stream, bool LittleEndianStream)
 				:	
 				IsPlatformLittleEndian(TestPlatformLittleEndian()),
-				m_pStream(Stream),
+				m_pStream(std::move(Stream)),
 				IsLittleEndian(LittleEndianStream)
 			{
 			}

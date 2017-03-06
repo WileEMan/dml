@@ -208,6 +208,7 @@ namespace wb
 				}
 
 				// Note: shflags are ignored on Linux.
+				#ifndef _LINUX
 				int shflags;
 				switch (share)
 				{
@@ -217,6 +218,7 @@ namespace wb
 				case FileShare::ReadWrite: shflags = _SH_DENYNO; break;
 				default: throw ArgumentException(S("Invalid share mode flag."));
 				}
+				#endif
 
 				Open(pszFilename, opflags);
 			}

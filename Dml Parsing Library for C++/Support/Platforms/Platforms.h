@@ -42,17 +42,17 @@ typedef signed long long Int64;
 
 #define UInt8_MaxValue		UCHAR_MAX
 #define UInt16_MaxValue		USHRT_MAX
-#define UInt32_MaxValue		ULONG_MAX
+#define UInt32_MaxValue		0xFFFFFFFF
 #define UInt64_MaxValue		ULLONG_MAX
 
 #define Int8_MinValue		SCHAR_MIN
 #define Int16_MinValue		SHRT_MIN
-#define Int32_MinValue		LONG_MIN
+#define Int32_MinValue		(-2147483647-1)
 #define Int64_MinValue		LLONG_MIN
 
 #define Int8_MaxValue		SCHAR_MAX
 #define Int16_MaxValue		SHRT_MAX
-#define Int32_MaxValue		LONG_MAX
+#define Int32_MaxValue		2147483647
 #define Int64_MaxValue		LLONG_MAX
 
 #define Float_MaxValue		FLT_MAX
@@ -68,7 +68,8 @@ static const size_t size_t_MaxValue = (size_t)-1;
 #define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif
 
-#if (defined(_MSC_VER))
+#if (defined(__GNUC__) && GCC_VERSION < 40700)
+	// If the compiler version does not support the override keyword, replace it with whitespace.
 #define override 
 #endif
 
@@ -218,6 +219,17 @@ namespace wb
 	inline Int32	Round32(double dVal){ return (fmod(dVal, 1.0) >= 0.5) ? (((Int32)dVal) + 1) : ((Int32)dVal); }
 	inline Int64	Round64(double dVal){ return (fmod(dVal, 1.0) >= 0.5) ? (((Int64)dVal) + 1) : ((Int64)dVal); }	
 }
+
+	/** Provide these macros when not running on Windows **/
+	
+/** Additional platform support **/
+
+#if !defined(_WINDOWS)
+    #define CopyMemory(Dest,Src,Len) memcpy(Dest,Src,(size_t)(Len))
+    #define FillMemory(Dest,Len,Byte) memset(Dest,(int)Byte,(size_t)(Len))
+    #define ZeroMemory(Dest,Len) memset(Dest,0,(size_t)(Len))
+    #define MoveMemory(Dest,Src,Len) memmove(Dest,Src,(size_t)(Len))
+#endif	// !_WINDOWS	
 
 	/** Emulate log2() for Visual C++ versions below 2013 **/
 #if defined(_MSC_VER) && _MSC_VER < 1800

@@ -40,7 +40,7 @@ namespace wb
 			const wchar_t* p = str.c_str();
 			char* tp = new char[sz];
 			size_t w = wcstombs(tp, p, sz);
-			if (w != sz) {
+			if (w != (size_t)sz) {
 				delete[] tp;				
 				throw Exception(S("Invalid size written during wide string to multibyte string conversion."));
 			}

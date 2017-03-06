@@ -71,28 +71,28 @@ namespace wb
 
 		// # of seconds past in year, given start of a month
 		static const UInt32 g_tableSecondsPastInNonLeapYear[13] = { 
-			-1, /*January 1st=*/ 0, 31 * PERDAY, 59 * PERDAY, 90 * PERDAY, 
+			0,  /*January 1st=*/ 0, 31 * PERDAY, 59 * PERDAY, 90 * PERDAY, 
 				/*May 1st=*/ 120 * PERDAY, 151 * PERDAY, 181 * PERDAY, 212 * PERDAY, 
 				/*September 1st=*/ 243 * PERDAY, 273 * PERDAY, 304 * PERDAY, 334 * PERDAY
 		};
 
 		// # of seconds past in year, given start of a month 
 		static const UInt32 g_tableSecondsPastInLeapYear[13] = { 
-			-1, /*January 1st=*/ 0, 31 * PERDAY, 60 * PERDAY, 91 * PERDAY, 
+			0,  /*January 1st=*/ 0, 31 * PERDAY, 60 * PERDAY, 91 * PERDAY, 
 				/*May 1st=*/ 121 * PERDAY, 152 * PERDAY, 182 * PERDAY, 213 * PERDAY, 
 				/*September 1st=*/ 244 * PERDAY, 274 * PERDAY, 305 * PERDAY, 335 *PERDAY
 		};
 
 		// # of seconds in given month
 		static const UInt32 g_tableSecondsInMonthLY[13] = {
-			-1, /*January*/ 31 * PERDAY, 29 * PERDAY, 31 * PERDAY, 30 * PERDAY, 
+			0,  /*January*/ 31 * PERDAY, 29 * PERDAY, 31 * PERDAY, 30 * PERDAY, 
 				/*May=*/ 31 * PERDAY, 30 * PERDAY, 31 * PERDAY, 31 * PERDAY, 
 				/*September=*/ 30 * PERDAY, 31 * PERDAY, 30 * PERDAY, 31 * PERDAY
 		};
 
 		// # of seconds in given month
 		static const UInt32 g_tableSecondsInMonthNLY[13] = {
-			-1, /*January*/ 31 * PERDAY, 28 * PERDAY, 31 * PERDAY, 30 * PERDAY, 
+			0,  /*January*/ 31 * PERDAY, 28 * PERDAY, 31 * PERDAY, 30 * PERDAY, 
 				/*May=*/ 31 * PERDAY, 30 * PERDAY, 31 * PERDAY, 31 * PERDAY, 
 				/*September=*/ 30 * PERDAY, 31 * PERDAY, 30 * PERDAY, 31 * PERDAY
 		};

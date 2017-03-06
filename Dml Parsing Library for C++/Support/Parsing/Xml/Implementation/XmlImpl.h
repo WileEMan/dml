@@ -104,7 +104,7 @@ namespace wb
 			for (int ii=0; ii < Options.Indentation; ii++) OnString += '\t';
 		}
 
-		inline string XmlNode::ToString(XmlWriterOptions Options) override
+		inline string XmlNode::ToString(XmlWriterOptions Options)
 		{
 			if (Options.IncludeContent)
 			{
@@ -178,7 +178,7 @@ namespace wb
 
 		/** XmlDocument Implementation **/
 		
-		inline string XmlDocument::ToString(XmlWriterOptions Options) override
+		inline string XmlDocument::ToString(XmlWriterOptions Options)
 		{		
 			if (!Options.IncludeContent) return "XmlDocument";
 			return XmlNode::ToString(Options);
@@ -263,7 +263,7 @@ namespace wb
 			Children.push_back(pNewText);
 		}		
 
-		inline string XmlElement::ToString(XmlWriterOptions Options) override
+		inline string XmlElement::ToString(XmlWriterOptions Options) 
 		{
 			string ret;
 			Indent(Options, ret);
@@ -498,7 +498,7 @@ namespace wb
 			while (index != string::npos) input = input.substr(0, index) + pszReplace + input.substr(index + 1);
 		}
 		
-		inline string XmlText::ToString(XmlWriterOptions Options) override
+		inline string XmlText::ToString(XmlWriterOptions Options) 
 		{
 			if (!Options.IncludeContent) return "XmlText";
 

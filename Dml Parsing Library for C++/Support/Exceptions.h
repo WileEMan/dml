@@ -99,7 +99,7 @@ namespace wb
 		virtual string GetMessage() const { return Message; }
 		inline string GetMessageA() const { return Message; }		// In case the MSVC macros interfere.
 		inline string GetMessageW() const { return Message; }		// In case the MSVC macros interfere.
-		const char *what() override const throw() { return Message.c_str(); }
+		const char *what() const throw() override { return Message.c_str(); }
 
 		static void ThrowFromErrno(int FromErrno);
 		#if defined(_WINDOWS)
@@ -136,6 +136,7 @@ namespace wb
 	DeclareGenericException(TimeoutException, S("A timeout has occurred."));	
 	DeclareGenericException(NetworkException, S("Network communication failure."));
 
+	#ifdef _WINDOWS
 	class COMException : public Exception {			
 	public:
 		HRESULT Code;
@@ -153,6 +154,7 @@ namespace wb
 		}
 		COMException(const string& message, HRESULT ErrorCode) : Exception(message) { Code = ErrorCode; }
 	};		
+	#endif
 
 	/** Implementations **/
 

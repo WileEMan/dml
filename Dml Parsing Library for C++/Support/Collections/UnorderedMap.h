@@ -47,6 +47,9 @@ namespace wb
 		unordered_map(const unordered_map& cp) : base(cp) { }
 		unordered_map(unordered_map&& mv) : base(mv) { }
 
+		unordered_map& operator=(const unordered_map& cp) { base::operator=(cp); return *this; }
+		unordered_map& operator=(unordered_map&& mv) { base::operator=(mv); return *this; }
+		
 		/** wb version extensions **/
 
 		void insert(const key_type& key, const mapped_type& value)

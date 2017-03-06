@@ -52,8 +52,8 @@
 	inline EnumType& operator&=(EnumType& x, EnumType y) { x = x & y; return x; }		\
 	inline EnumType& operator|=(EnumType& x, EnumType y) { x = x | y; return x; }		\
 	inline EnumType& operator^=(EnumType& x, EnumType y) { x = x ^ y; return x; }		\
-	inline bool operator==(const EnumType& x, int y) { return static_cast<FlagType>(x) == y; }		\
-	inline bool operator!=(const EnumType& x, int y) { return static_cast<FlagType>(x) != y; }	
+	inline bool operator==(const EnumType& x, FlagType y) { return static_cast<FlagType>(x) == y; }		\
+	inline bool operator!=(const EnumType& x, FlagType y) { return static_cast<FlagType>(x) != y; }
 
 #endif
 

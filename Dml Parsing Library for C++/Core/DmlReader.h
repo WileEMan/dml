@@ -1243,7 +1243,8 @@ namespace wb
 					switch (Reader.GetNodeType())
 					{
 					case NodeTypes::EndContainer: return;
-					case NodeTypes::Container: SkipContainer(Reader);
+					case NodeTypes::Container: SkipContainer(Reader); continue;
+					default: continue;
 					}
 				}
 			}
@@ -1374,7 +1375,7 @@ namespace wb
 							UInt32 NewID = 0; bool GotID = false;
 							string NewType;
 							UInt32 NewToID = 0; bool GotToID = false;
-							Translation NewTranslation; bool GotLocalTranslation = false;
+							Translation NewTranslation;
 							if (Reader.GetID() == dmltsl::tsl2::idContainer) NewType = "container";
                             
 							for (; ; )
@@ -1398,7 +1399,6 @@ namespace wb
 											throw Exception(string(exc.what()) + "\n\twhile parsing local translation definition for <" + NewName + "> given in dml.");
 										}
 
-										if (NewTranslation.GetCount() != 0) GotLocalTranslation = true;
 										break;          // Because ParseDmlTranslation() ran until EndContainer was reached.
 									}
 									continue;
