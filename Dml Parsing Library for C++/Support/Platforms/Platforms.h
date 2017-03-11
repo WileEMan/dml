@@ -68,11 +68,6 @@ static const size_t size_t_MaxValue = (size_t)-1;
 #define GCC_VERSION (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
 #endif
 
-#if (defined(__GNUC__) && GCC_VERSION < 40700)
-	// If the compiler version does not support the override keyword, replace it with whitespace.
-#define override 
-#endif
-
 #if (defined(_MSC_VER) && (_MSC_VER > 1800)) || (defined(GCC_VERSION) && (GCC_VERSION >= 40600))
 	// Not sure on exact versions.  Also there is confusion between whether the compiler truly supports
 	// constexpr or at least recognizes the keyword without error (which is the goal here).  The constexpr_please
@@ -116,6 +111,14 @@ static const size_t size_t_MaxValue = (size_t)-1;
 	#define MaybeUnused
 #endif
 
+/** Verify minimum requirements **/
+
+#if defined(GCC_VERSION)
+	#if !defined(__cplusplus) || (__cplusplus < 201100L)
+		#error The C++11 standard is required for this library.  For some compilers, you may need to enable it via a command-line option.
+	#endif
+#endif
+
 /** Compatibility with older compiler and standards **/
 
 #if (defined(GCC_VERSION) && GCC_VERSION < 40700)
@@ -153,12 +156,12 @@ static const size_t size_t_MaxValue = (size_t)-1;
 			bool operator!=(const x& b) const { return Value != b.Value; }		\
 			operator ty() const { return Value; }				\
 		};		
-	#define enum_type(x)					x::Values
+	//#define enum_type(x)					x::Values
 	#define UsingEnumClassEmulation
 #else
 	#define enum_class_start(x,type)		enum class x : type
-	#define enum_class_end(x)				;
-	#define enum_type(x)					x
+	#define enum_class_end(x)				
+	//#define enum_type(x)					x				// macro name conflicts with a google protobuf name.  Also doesn't seem to be used.
 #endif
 
 #ifdef UseSTL

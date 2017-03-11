@@ -102,10 +102,10 @@ namespace wb
 				m_bCanRead = m_bCanWrite = false;
 			}
 
-			FileStream(const char *pszFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
+			FileStream(const string& sFilename, FileMode mode, FileAccess access = FileAccess::ReadWrite, FileShare share = FileShare::Read)
 			{
 				m_bCanRead = m_bCanWrite = false;
-				Open(pszFilename, mode, access, share);
+				Open(sFilename.c_str(), mode, access, share);
 			}
 
 			#if defined(_WINDOWS)

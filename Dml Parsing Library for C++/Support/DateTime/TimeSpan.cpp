@@ -14,7 +14,7 @@ namespace wb
 	/*static*/ const TimeSpan TimeSpan::Invalid(Int64_MaxValue, Int32_MaxValue);
 	/*static*/ const TimeSpan TimeSpan::Zero(0, 0);
 
-	bool TimeSpan::TryParse(const schar *lpsz, TimeSpan& Value)
+	bool TimeSpan::TryParse(const char *lpsz, TimeSpan& Value)
 	{
 		size_t iDivider;
 		string	str( lpsz );
@@ -93,7 +93,7 @@ namespace wb
 		return true;
 	}
 
-	/*static*/ TimeSpan TimeSpan::Parse(const schar* psz)
+	/*static*/ TimeSpan TimeSpan::Parse(const char* psz)
 	{
 		TimeSpan ret;
 		if (!TryParse(psz, ret))
@@ -144,7 +144,7 @@ namespace wb
 				}
 			}
 		
-			schar tmp[64];
+			char tmp[64];
 			#ifdef _MSC_VER
 			if( nHours < 24 )
 				sprintf_s(tmp, S("%d:%02d:%02d hours"), nHours, nMinutes, nSeconds );
@@ -163,7 +163,7 @@ namespace wb
 		{
 			double dSeconds = (double)nSeconds + (double)nNanoseconds * time_constants::g_dSecondsPerNanosecond;
 
-			schar tmp[64];
+			char tmp[64];
 			#ifdef _MSC_VER
 			if( abs(nHours) < 24 )
 				sprintf_s(tmp, S("%d:%02d:%02.*f hours"), nHours, nMinutes, Precision, dSeconds );
@@ -191,7 +191,7 @@ namespace wb
 		string Sign = S("");
 		if (IsNegative()) Sign = S("-");
 
-		schar tmp[64];
+		char tmp[64];
 		Int64 nTotalDays	= abs(GetTotalDays());
 
 		if( nTotalDays > 90ll )

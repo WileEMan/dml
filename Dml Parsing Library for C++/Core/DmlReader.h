@@ -13,6 +13,7 @@
 #include "../Support/IO/EndianBinaryReader.h"
 #include "../Support/Text/StringComparison.h"
 #include "../Support/Parsing/Xml/XmlParser.h"
+#include "../Support/IO/Streams.h"
 #include "../Dml.h"
 
 namespace wb
@@ -369,8 +370,7 @@ namespace wb
 				if (SetName.compare("dml-ec2") == 0)
 				{
 					throw CreateDmlException("DML-EC2 is not supported by reader.");
-					// if (Codec.ToLower() != "v1") throw CreateDmlException("DML-EC codec is not recognized by reader.");
-					return;
+					// if (Codec.ToLower() != "v1") throw CreateDmlException("DML-EC codec is not recognized by reader.");					
 				}
 				/**					
 				try

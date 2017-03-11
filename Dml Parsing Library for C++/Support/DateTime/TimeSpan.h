@@ -108,8 +108,8 @@ namespace wb
 				where:
 					SS represents seconds, and may contain any number of decimal digits.
 			**/
-		static bool TryParse(const schar*, TimeSpan&);
-		static TimeSpan Parse(const schar*);
+		static bool TryParse(const char*, TimeSpan&);
+		static TimeSpan Parse(const char*);
 
 			/** asExactString()
 				Returns string as "XX days H:MM:SS.sss hours", always including seconds.

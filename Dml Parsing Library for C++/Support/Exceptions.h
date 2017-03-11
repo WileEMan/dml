@@ -64,7 +64,7 @@ namespace std
 namespace wb
 {	
 	class Exception 
-#		if UseSTL
+#		ifdef UseSTL
 		: public std::exception
 #		endif
 	{
@@ -89,7 +89,7 @@ namespace wb
 		Exception(const Exception &right) { Message = right.Message; }
 		Exception(Exception&& from) { Message = std::move(from.Message); }
 		Exception& operator=(const Exception &right) { 
-#			if UseSTL
+#			ifdef UseSTL
 			std::exception::operator=(right);
 #			endif
 			Message = right.Message; 

@@ -175,7 +175,7 @@ namespace wb
 			/// </summary>
 			Padding
 		}
-		enum_class_end(NodeTypes)
+		enum_class_end(NodeTypes);
 
 		enum_class_start(PrimitiveTypes,int)
 		{

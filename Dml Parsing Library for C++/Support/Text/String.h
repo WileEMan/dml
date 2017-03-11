@@ -25,7 +25,7 @@
 
 #define S(psz)		(psz)
 #define os(psz)		_T(psz)
-typedef char schar;
+typedef signed char schar;
 
 #include <string.h>
 
