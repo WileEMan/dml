@@ -190,7 +190,7 @@ namespace wb
 				int opflags = 0;
 				switch (mode)
 				{
-				case FileMode::Append: opflags = O_APPEND; break;
+				case FileMode::Append: opflags = O_CREAT; break;			// O_APPEND on Linux is a bit different than what FileStream really wants to achieve.  We'll seek below.
 				case FileMode::Create: opflags = O_CREAT | O_TRUNC; break;
 				case FileMode::CreateNew: opflags = O_CREAT | O_EXCL; break;
 				case FileMode::Open: opflags = 0; break;
@@ -221,6 +221,8 @@ namespace wb
 				#endif
 
 				Open(pszFilename, opflags);
+
+				if (mode == FileMode::Append) Seek(0, SeekOrigin::End);
 			}
 			#endif
 
