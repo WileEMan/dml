@@ -46,13 +46,16 @@ namespace wb
 		TimeSpan();
 		TimeSpan( const TimeSpan& );		
 		TimeSpan( Int64 nDays, int nHours, int nMinutes, int nSeconds, int nNanoseconds = 0 );
-		TimeSpan( Int64 nElapsedSeconds, Int32 nElapsedNanoseconds );
 	#	ifdef _MFC
 		TimeSpan( const CTimeSpan& );
 	#	endif
 
-		static const TimeSpan Invalid;
-		static const TimeSpan Zero;
+		static TimeSpan FromSeconds(Int64 nElapsedSeconds, Int32 nElapsedNanoseconds = 0);
+		static TimeSpan FromSeconds(double ElapsedSeconds);
+		static TimeSpan FromNanoseconds(Int64 nElapsedNanoseconds);
+
+		static const TimeSpan GetInvalid() { return FromSeconds(Int64_MaxValue, Int32_MaxValue); }
+		static const TimeSpan GetZero() { return FromSeconds(0, 0); }
 
 		// All Get...() calls (except GetTotal...() and GetApproxTotal...() calls) will return the absolute time.  For example, if 
 		// the time span represents -2 hours, then GetDays() = 0, GetHours() = 2, so forth, and IsNegative() is true.
@@ -70,20 +73,15 @@ namespace wb
 		void	Get( Int64& nDays, Int32& nHours, Int32& nMinutes, Int32& nSeconds ) const;
 		void	Get( Int64& nDays, Int32& nHours, Int32& nMinutes, Int32& nSeconds, Int32& nNanoseconds ) const;
 
-			// Note: The GetTotal...() functions round to the nearest whole number.  For example, 119 seconds -> 2 minutes.
-		Int64	GetTotalDays() const;
-		Int64	GetTotalHours() const;
-		Int64	GetTotalMinutes() const;
-		Int64	GetTotalSeconds() const;
+		double	GetTotalDays() const;
+		double	GetTotalHours() const;
+		double	GetTotalMinutes() const;
+		double	GetTotalSeconds() const;			
+		double	GetTotalMilliseconds() const;
+		double	GetTotalMicroseconds() const;
 
-			// These GetTotal...() functions will throw an exception if the returned value cannot fit in an Int64 value.  For
-			// nanoseconds this occurs with intervals longer than about 290 years, and is longer for the remaining calls.
-		Int64	GetTotalMilliseconds() const;
-		Int64	GetTotalMicroseconds() const;
-
-			// These GetTotal...() functions use no rounding.  GetTotalNanoseconds will throw an exception on intervals longer
-			// than about 290 years.
-		Int64	GetTotalSecondsNoRounding() const;
+			// This GetTotal...() function is exact, but will throw an exception on intervals longer than about 290 years
+			// (which is the overflow limit for nanosecond storage within a single 64-bit integer).
 		Int64	GetTotalNanoseconds() const;
 
 			// Since CDateTimeSpan objects are not affixed to a calender date, these functions provide approximations only.	
@@ -111,16 +109,16 @@ namespace wb
 		static bool TryParse(const char*, TimeSpan&);
 		static TimeSpan Parse(const char*);
 
-			/** asExactString()
+			/** asExactString() / ToString()
 				Returns string as "XX days H:MM:SS.sss hours", always including seconds.
 				Returns string as "H:MM:SS.sss hours", when less than a day elapsed.
 
 				If Precision is zero then the ".sss" component is omitted.  Otherwise Precision controls the number
 				of digits after the decimal place, up to a maximum of 9.
 			**/
-
 		string ToString(int Precision = 9) const;
-		string ToShortString() const;		// Returns string as "YY months", showing only highest-level unit.
+		string ToShortString(int Precision = 3) const;		// Returns string as "YY.yyy days", showing only highest-level unit, with the number of decimal spaces specified by Precision.
+		string ToApproxString() const;						// Returns string as "YY days", showing only highest-level unit.  Allows years and month approximations.
 
 			/** Operations **/
 
@@ -147,12 +145,6 @@ namespace wb
 
 	inline TimeSpan::TimeSpan() { m_nElapsedSeconds = 0; m_nElapsedNanoseconds = 0; }
 	inline TimeSpan::TimeSpan( const TimeSpan& cp ) : m_nElapsedSeconds(cp.m_nElapsedSeconds), m_nElapsedNanoseconds(cp.m_nElapsedNanoseconds) { }
-	inline TimeSpan::TimeSpan(Int64 nElapsedSeconds, Int32 nElapsedNanoseconds) {
-		m_nElapsedSeconds = nElapsedSeconds;
-		m_nElapsedNanoseconds = nElapsedNanoseconds; 
-		assert ((m_nElapsedNanoseconds > -1000000000 && m_nElapsedNanoseconds < 1000000000) 
-			|| (m_nElapsedSeconds == Int64_MaxValue && m_nElapsedNanoseconds == Int32_MaxValue));
-	}
 	inline TimeSpan::TimeSpan(Int64 nDays, int nHours, int nMinutes, int nSeconds, int nNanoseconds /*= 0*/) {
 		m_nElapsedSeconds =  (nDays * time_constants::g_nSecondsPerDay) + ((Int64)nHours * time_constants::g_nSecondsPerHour) 
 						  + ((Int64)nMinutes * time_constants::g_nSecondsPerMinute) + (Int64)nSeconds;
@@ -160,6 +152,28 @@ namespace wb
 		if (m_nElapsedSeconds < 0) m_nElapsedNanoseconds = -m_nElapsedNanoseconds;
 		assert (m_nElapsedNanoseconds > -1000000000 && m_nElapsedNanoseconds < 1000000000);
 	}
+
+	inline /*static*/ TimeSpan TimeSpan::FromSeconds(Int64 nElapsedSeconds, Int32 nElapsedNanoseconds /*= 0*/) {
+		TimeSpan ret;
+		ret.m_nElapsedSeconds = nElapsedSeconds;
+		ret.m_nElapsedNanoseconds = nElapsedNanoseconds; 
+		assert ((ret.m_nElapsedNanoseconds > -1000000000 && ret.m_nElapsedNanoseconds < 1000000000) 
+			|| (ret.m_nElapsedSeconds == Int64_MaxValue && ret.m_nElapsedNanoseconds == Int32_MaxValue));
+		return ret;
+	}
+	inline /*static*/ TimeSpan TimeSpan::FromSeconds(double ElapsedSeconds) {
+		Int64 Whole = (Int64)floor(ElapsedSeconds);		
+		double Rem = fmod(ElapsedSeconds, 1.0);
+		Int32 Nanoseconds = Round32(1000000000.0 * Rem);
+		return FromSeconds(Whole, Nanoseconds);		
+	}
+	inline /*static*/ TimeSpan TimeSpan::FromNanoseconds(Int64 nElapsedNanoseconds) {
+		TimeSpan ret;
+		ret.m_nElapsedSeconds = nElapsedNanoseconds / 1000000000ll;
+		ret.m_nElapsedNanoseconds = (Int32)(nElapsedNanoseconds % 1000000000ll);
+		return ret;
+	}
+
 	#ifdef _MFC
 	inline TimeSpan::TimeSpan( const CTimeSpan& tmSpan ){ m_nElapsedSeconds = tmSpan.GetTotalSeconds(); m_nElapsedNanoseconds = 0; }
 	#endif	
@@ -178,42 +192,32 @@ namespace wb
 	inline Int32	TimeSpan::GetSeconds() const { return (Int32)(abs(m_nElapsedSeconds) % time_constants::g_nSecondsPerMinute); }	
 	inline Int32	TimeSpan::GetNanoseconds() const { return abs(m_nElapsedNanoseconds); }	
 	
-	// Note: We disregard the nanoseconds in the following calculations.  The only effect is to nudge the rounding by 0.5 seconds, which only matters if
-	// the total days, hours, or minutes value was directly on a half-unit.
-	inline Int64	TimeSpan::GetTotalDays() const { return Round64(m_nElapsedSeconds /*seconds*/ / time_constants::g_dSecondsPerDay /*seconds/day*/ ); }
-	inline Int64	TimeSpan::GetTotalHours() const { return Round64(m_nElapsedSeconds /*seconds*/ / time_constants::g_dSecondsPerHour /*seconds/hour*/ ); }
-	inline Int64	TimeSpan::GetTotalMinutes() const { return Round64(m_nElapsedSeconds /*seconds*/ / time_constants::g_dSecondsPerMinute /*seconds/minute*/ ); }
-
-	// Now we consider nanoseconds...
-	inline Int64	TimeSpan::GetTotalSeconds() const { 
-		if (m_nElapsedSeconds >= 0)
-			return (m_nElapsedNanoseconds > (time_constants::g_n32NanosecondsPerSecond/2)) ? (m_nElapsedSeconds + 1) : (m_nElapsedSeconds);
-		else
-			return (m_nElapsedNanoseconds > -(time_constants::g_n32NanosecondsPerSecond/2)) ? (m_nElapsedSeconds) : (m_nElapsedSeconds - 1);
+	inline double	TimeSpan::GetTotalDays() const { 
+		return (m_nElapsedSeconds /*seconds*/ / time_constants::g_dSecondsPerDay /*seconds/day*/)
+			 + (m_nElapsedNanoseconds /*ns*/ / time_constants::g_dNanosecondsPerDay /*ns/day*/);
+	}
+	inline double	TimeSpan::GetTotalHours() const { 
+		return (m_nElapsedSeconds /*seconds*/ / time_constants::g_dSecondsPerHour /*seconds/hour*/)
+			+  (m_nElapsedNanoseconds /*ns*/ / time_constants::g_dNanosecondsPerHour /*ns/hour*/);
+	}
+	inline double	TimeSpan::GetTotalMinutes() const { 
+		return (m_nElapsedSeconds /*seconds*/ / time_constants::g_dSecondsPerMinute /*seconds/minute*/)
+			+  (m_nElapsedNanoseconds /*ns*/ / time_constants::g_dNanosecondsPerMinute /*ns/minute*/);
+	}	
+	inline double	TimeSpan::GetTotalSeconds() const { 
+		return m_nElapsedSeconds + (m_nElapsedNanoseconds /*ns*/ / time_constants::g_dNanosecondsPerSecond /*ns/second*/);
 	}
 
-	inline Int64	TimeSpan::GetTotalSecondsNoRounding() const { return m_nElapsedSeconds; }
-
-	inline Int64	TimeSpan::GetTotalMilliseconds() const { 
-		static const Int64 MSPerS = 1000ll;
-		static const Int64 MaxS = (Int64_MaxValue / MSPerS);
-		if (abs(m_nElapsedSeconds) + 1 > MaxS)
-			throw ArgumentOutOfRangeException("Cannot retrieve total milliseconds on time spans longer than " + to_string(MaxS) + " seconds.");
-		if (m_nElapsedSeconds >= 0)
-			return (m_nElapsedSeconds * MSPerS) + Round64(m_nElapsedNanoseconds / 1000000.0);
-		else 
-			return (m_nElapsedSeconds * MSPerS) - Round64(m_nElapsedNanoseconds / 1000000.0);
+	inline double	TimeSpan::GetTotalMilliseconds() const { 
+		static const double MSPerS = 1000.0 /*ms/s*/;
+		static const double NSPerMS = 1000000.0 /*ns/ms*/;
+		return (m_nElapsedSeconds /*seconds*/ * MSPerS /*ms/s*/) + (m_nElapsedNanoseconds /*ns*/ / NSPerMS /*ns/ms*/);
 	}
 
-	inline Int64	TimeSpan::GetTotalMicroseconds() const { 
-		static const Int64 USPerS = 1000000ll;
-		static const Int64 MaxS = (Int64_MaxValue / USPerS);
-		if (abs(m_nElapsedSeconds) + 1 > MaxS)
-			throw ArgumentOutOfRangeException("Cannot retrieve total microseconds on time spans longer than " + to_string(MaxS) + " seconds.");
-		if (m_nElapsedSeconds >= 0)
-			return (m_nElapsedSeconds * USPerS) + Round64(m_nElapsedNanoseconds / 1000.0);
-		else 
-			return (m_nElapsedSeconds * USPerS) - Round64(m_nElapsedNanoseconds / 1000.0);
+	inline double	TimeSpan::GetTotalMicroseconds() const { 
+		static const double USPerS = 1000000.0 /*us/s*/;		
+		static const double NSPerUS = 1000.0 /*ns/us*/;
+		return (m_nElapsedSeconds /*seconds*/ * USPerS /*us/s*/) + (m_nElapsedNanoseconds /*ns*/ / NSPerUS /*ns/us*/);		
 	}
 
 	inline Int64	TimeSpan::GetTotalNanoseconds() const { 
@@ -273,16 +277,16 @@ namespace wb
 	inline TimeSpan TimeSpan::operator+( const TimeSpan& span ) const 
 	{ 
 		Int32 NewNanoseconds = m_nElapsedNanoseconds + span.m_nElapsedNanoseconds;
-		if (NewNanoseconds >= time_constants::g_n32NanosecondsPerSecond) return TimeSpan(m_nElapsedSeconds + span.m_nElapsedSeconds + 1, NewNanoseconds - time_constants::g_n32NanosecondsPerSecond);
-		else if (NewNanoseconds <= -time_constants::g_n32NanosecondsPerSecond) return TimeSpan(m_nElapsedSeconds + span.m_nElapsedSeconds - 1, NewNanoseconds + time_constants::g_n32NanosecondsPerSecond);
-		else return TimeSpan(m_nElapsedSeconds + span.m_nElapsedSeconds, NewNanoseconds); 
+		if (NewNanoseconds >= time_constants::g_n32NanosecondsPerSecond) return FromSeconds(m_nElapsedSeconds + span.m_nElapsedSeconds + 1, NewNanoseconds - time_constants::g_n32NanosecondsPerSecond);
+		else if (NewNanoseconds <= -time_constants::g_n32NanosecondsPerSecond) return FromSeconds(m_nElapsedSeconds + span.m_nElapsedSeconds - 1, NewNanoseconds + time_constants::g_n32NanosecondsPerSecond);
+		else return FromSeconds(m_nElapsedSeconds + span.m_nElapsedSeconds, NewNanoseconds); 
 	}
 	inline TimeSpan TimeSpan::operator-( const TimeSpan& span ) const 
 	{ 
 		Int32 NewNanoseconds = m_nElapsedNanoseconds - span.m_nElapsedNanoseconds;
-		if (NewNanoseconds >= time_constants::g_n32NanosecondsPerSecond) return TimeSpan(m_nElapsedSeconds - span.m_nElapsedSeconds + 1, NewNanoseconds - time_constants::g_n32NanosecondsPerSecond);
-		else if (NewNanoseconds <= -time_constants::g_n32NanosecondsPerSecond) return TimeSpan(m_nElapsedSeconds - span.m_nElapsedSeconds - 1, NewNanoseconds + time_constants::g_n32NanosecondsPerSecond);
-		else return TimeSpan(m_nElapsedSeconds - span.m_nElapsedSeconds, NewNanoseconds); 
+		if (NewNanoseconds >= time_constants::g_n32NanosecondsPerSecond) return FromSeconds(m_nElapsedSeconds - span.m_nElapsedSeconds + 1, NewNanoseconds - time_constants::g_n32NanosecondsPerSecond);
+		else if (NewNanoseconds <= -time_constants::g_n32NanosecondsPerSecond) return FromSeconds(m_nElapsedSeconds - span.m_nElapsedSeconds - 1, NewNanoseconds + time_constants::g_n32NanosecondsPerSecond);
+		else return FromSeconds(m_nElapsedSeconds - span.m_nElapsedSeconds, NewNanoseconds); 
 	}
 
 	inline const TimeSpan& TimeSpan::operator=( const TimeSpan& cp ){ m_nElapsedSeconds = cp.m_nElapsedSeconds; m_nElapsedNanoseconds = cp.m_nElapsedNanoseconds; return *this; }

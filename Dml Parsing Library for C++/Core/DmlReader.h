@@ -1895,7 +1895,7 @@ namespace wb
 				DateTime Value = dml::ReferenceDate;
 				Int64 Seconds = TimeValue / 1000000000ll;
 				Int32 Nanoseconds = TimeValue % 1000000000ll;
-				Value += TimeSpan(Seconds, Nanoseconds);
+				Value += TimeSpan::FromSeconds(Seconds, Nanoseconds);
 				return Value;
 			}
 

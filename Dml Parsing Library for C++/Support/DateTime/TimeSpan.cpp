@@ -11,8 +11,8 @@
 
 namespace wb
 {		
-	/*static*/ const TimeSpan TimeSpan::Invalid(Int64_MaxValue, Int32_MaxValue);
-	/*static*/ const TimeSpan TimeSpan::Zero(0, 0);
+	///*static*/ const TimeSpan TimeSpan::Invalid(Int64_MaxValue, Int32_MaxValue);
+	///*static*/ const TimeSpan TimeSpan::Zero(0, 0);
 
 	bool TimeSpan::TryParse(const char *lpsz, TimeSpan& Value)
 	{
@@ -181,20 +181,17 @@ namespace wb
 
 	}// End of ToString()			
 
-	string TimeSpan::ToShortString() const
+	string TimeSpan::ToApproxString() const
 	{
 			// Returns string as "XX Days", showing only highest-level unit.
-
-			/** Attention must be paid to the rounding that occurs in different
-				Get...() calls. **/
 
 		string Sign = S("");
 		if (IsNegative()) Sign = S("-");
 
 		char tmp[64];
-		Int64 nTotalDays	= abs(GetTotalDays());
+		Int64 nTotalDays	= abs((int)GetTotalDays());
 
-		if( nTotalDays > 90ll )
+		if( nTotalDays > 90ll)
 		{
 			if( GetApproxTotalYears() >= 2ll )			// Note: We allow months up to 24...
 			{
@@ -220,79 +217,136 @@ namespace wb
 			if( nTotalDays >= 2ll )					// Note: We allow hours up to 48...
 			{
 				#ifdef _MSC_VER
-				sprintf_s(tmp, S("%lld days"), GetTotalDays() );
+				sprintf_s(tmp, S("%lld days"), Round64(GetTotalDays()) );
 				#else
-				sprintf(tmp, S("%lld days"), GetTotalDays() );
+				sprintf(tmp, S("%lld days"), Round64(GetTotalDays()) );
 				#endif
-				return Sign + tmp;
+				return tmp;
 			}
 			else if( abs(GetTotalMinutes()) > 90 )			// Note: We allow minutes up to 90...
 			{
 				#ifdef _MSC_VER
-				sprintf_s(tmp, S("%lld hours"), GetTotalHours() );
+				sprintf_s(tmp, S("%lld hours"), Round64(GetTotalHours()) );
 				#else
-				sprintf(tmp, S("%lld hours"), GetTotalHours() );
+				sprintf(tmp, S("%lld hours"), Round64(GetTotalHours()) );
 				#endif
-				return Sign + tmp;
+				return tmp;
 			}
 			else 
 			{
 				if( abs(GetTotalSeconds()) > 90 ){					// Note: We allow seconds up to 90...
 
 					#ifdef _MSC_VER
-					sprintf_s(tmp, S("%lld minutes"), abs(GetTotalMinutes()) );
+					sprintf_s(tmp, S("%lld minutes"), Round64(GetTotalMinutes()) );
 					#else
-					sprintf(tmp, S("%lld minutes"), llabs(GetTotalMinutes()) );
+					sprintf(tmp, S("%lld minutes"), Round64(GetTotalMinutes()) );
 					#endif
-					return Sign + tmp;
+					return tmp;
 				}
 			
-				Int64 TotalSeconds = abs(GetTotalSeconds());
-				if (TotalSeconds > 30){
+				double TotalSeconds = GetTotalSeconds();
+				if (abs(TotalSeconds) > 30){
 					#ifdef _MSC_VER
-					sprintf_s(tmp, S("%lld seconds"), abs(GetTotalSeconds()) );
+					sprintf_s(tmp, S("%lld seconds"), Round64(GetTotalSeconds()) );
 					#else
-					sprintf(tmp, S("%lld seconds"), llabs(GetTotalSeconds()) );
+					sprintf(tmp, S("%lld seconds"), Round64(GetTotalSeconds()) );
 					#endif
-					return Sign + tmp;
+					return tmp;
+				}				
+
+				if (abs(TotalSeconds) > 5){
+					#ifdef _MSC_VER
+					sprintf_s(tmp, S("%.1f seconds"), TotalSeconds);
+					#else
+					sprintf(tmp, S("%.1f seconds"), TotalSeconds);
+					#endif
+					return tmp;
 				}
 
-				double dSeconds = (double)TotalSeconds + (double)GetNanoseconds() * time_constants::g_dSecondsPerNanosecond;
-
-				if (TotalSeconds > 5){
+				if (abs(TotalSeconds) > 0.030){
 					#ifdef _MSC_VER
-					sprintf_s(tmp, S("%.1f seconds"), dSeconds);
+					sprintf_s(tmp, S("%.3f seconds"), TotalSeconds);
 					#else
-					sprintf(tmp, S("%.1f seconds"), dSeconds);
+					sprintf(tmp, S("%.3f seconds"), TotalSeconds);
 					#endif
-					return Sign + tmp;
+					return tmp;
 				}
 
-				if (dSeconds > 0.030){
+				if (abs(TotalSeconds) >= 0.000030){
 					#ifdef _MSC_VER
-					sprintf_s(tmp, S("%.3f seconds"), dSeconds);
+					sprintf_s(tmp, S("%.6f seconds"), TotalSeconds);
 					#else
-					sprintf(tmp, S("%.3f seconds"), dSeconds);
+					sprintf(tmp, S("%.6f seconds"), TotalSeconds);
 					#endif
-					return Sign + tmp;
+					return tmp;
 				}
 
-				if (dSeconds >= 0.000030){
 					#ifdef _MSC_VER
-					sprintf_s(tmp, S("%.6f seconds"), dSeconds);
+				sprintf_s(tmp, S("%lld nanoseconds"), GetTotalNanoseconds());
 					#else
-					sprintf(tmp, S("%.6f seconds"), dSeconds);
+				sprintf(tmp, S("%lld nanoseconds"), GetTotalNanoseconds());
 					#endif
-					return Sign + tmp;
-				}
-
-				#ifdef _MSC_VER
-				sprintf_s(tmp, S("%d nanoseconds"), GetNanoseconds());
-				#else
-				sprintf(tmp, S("%ld nanoseconds"), GetNanoseconds());
-				#endif
-				return Sign + tmp;
+				return tmp;
 			}
+				}
+	}// End of ToApproxString()
+
+	string TimeSpan::ToShortString(int Precision /*= 3*/) const
+	{
+			// Returns string as "XX Days", showing only highest-level unit.			
+
+		string Sign = S("");
+		if (IsNegative()) Sign = S("-");
+
+		char tmp[64];
+		Int64 nTotalDays	= abs((int)GetTotalDays());
+
+		if( nTotalDays >= 2ll )					// Note: We allow hours up to 48...
+		{
+			#ifdef _MSC_VER
+			sprintf_s(tmp, S("%.*f days"), Precision, GetTotalDays() );
+			#else
+			sprintf(tmp, S("%.*f days"), Precision, GetTotalDays() );
+			#endif
+			return tmp;
+		}
+		else if( abs(GetTotalMinutes()) > 90 )			// Note: We allow minutes up to 90...
+		{
+					#ifdef _MSC_VER
+			sprintf_s(tmp, S("%.*f hours"), Precision, GetTotalHours() );
+					#else
+			sprintf(tmp, S("%.*f hours"), Precision, GetTotalHours() );
+					#endif
+			return tmp;
+				}
+		else 
+		{
+			if( abs(GetTotalSeconds()) > 90 ){					// Note: We allow seconds up to 90...
+
+					#ifdef _MSC_VER
+				sprintf_s(tmp, S("%.*f minutes"), Precision, GetTotalMinutes() );
+					#else
+				sprintf(tmp, S("%.*f minutes"), Precision, GetTotalMinutes() );
+					#endif
+				return tmp;
+				}
+
+			double TotalSeconds = GetTotalSeconds();			
+			if (abs(TotalSeconds) >= 0.000030){
+				#ifdef _MSC_VER
+				sprintf_s(tmp, S("%.*f seconds"), Precision, TotalSeconds);
+				#else
+				sprintf(tmp, S("%.*f seconds"), Precision, TotalSeconds);
+				#endif
+				return tmp;
+			}
+
+			#ifdef _MSC_VER
+			sprintf_s(tmp, S("%lld nanoseconds"), GetTotalNanoseconds());
+			#else
+			sprintf(tmp, S("%lld nanoseconds"), GetTotalNanoseconds());
+			#endif
+			return tmp;
 		}
 	}// End of ToShortString()
 }

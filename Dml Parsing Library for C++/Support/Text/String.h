@@ -221,6 +221,9 @@ namespace wb
 		Elem& operator[] (size_t pos) { return m_pData[pos]; }
 		const Elem& operator[] (size_t pos) const { return m_pData[pos]; }
 
+		Elem& at(size_t pos) { if (pos >= m_nLength) throw ArgumentOutOfRangeException("Attempt to retrieve character beyond string bounds."); return m_pData[pos]; }
+		const Elem& at(size_t pos) const { if (pos >= m_nLength) throw ArgumentOutOfRangeException("Attempt to retrieve character beyond string bounds."); return m_pData[pos]; }
+
 		/** Operations **/		
 
 		basic_string<Elem>& operator+=(const basic_string<Elem>& str)

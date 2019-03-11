@@ -32,7 +32,13 @@ namespace wb
 		{
 		}
 
-		inline XmlDocument* XmlParser::Parse(wb::io::Stream& stream)
+		inline string XmlParser::GetSource()
+		{			
+			if (CurrentSource.length() < 1) return "line " + std::to_string(CurrentLineNumber);
+			return CurrentSource + ":" + std::to_string(CurrentLineNumber);
+		}
+
+		inline XmlDocument* XmlParser::Parse(wb::io::Stream& stream, const string& sSourceFilename)
 		{
 			// Optimization: Could avoid storing the whole thing in memory and parse as we go...
 			wb::io::MemoryStream ms;
@@ -40,36 +46,51 @@ namespace wb
 			ms.Seek(0, wb::io::SeekOrigin::End);
 			ms.WriteByte(0);			// Add null-terminator
 			ms.Rewind();
-			return Parse((const char *)ms.GetDirectAccess(0));
+			return Parse((const char *)ms.GetDirectAccess(0), sSourceFilename);
 		}
 
-		inline XmlDocument* XmlParser::Parse(const char *psz)
+		inline XmlDocument* XmlParser::Parse(const char *psz, const string& sSourceFilename)
 		{
+			CurrentSource = sSourceFilename;
+			CurrentLineNumber = 1;
+
+			if (psz[0] != 0 && psz[1] != 0 && psz[2] != 0)
+			{				
+				if ((byte)psz[0] == 0xEF && (byte)psz[1] == 0xBB && (byte)psz[2] == 0xBF) 
+					psz += 3; 														// UTF-8 BOM.  TODO: Respond to detected encoding.
+			}			
+
 			for (;; psz++)
 			{
 				if (*psz == 0) {
-					throw ArgumentException("No XML content found.");
+					if (CurrentSource.length() < 1) 
+						throw ArgumentException("No XML content found.");
+					else
+						throw ArgumentException("No XML content found in " + CurrentSource + ".");
 				}
 
 				if (*psz == '<') {			
 					if (*(psz+1) == '?'){
 						if (!ParseXMLDeclaration(psz)) {
-							throw FormatException("Invalid XML declaration format.");
+							throw FormatException("Invalid XML declaration format at " + GetSource() + ".");
 						}
 						continue;
 					}
 					break;
 				}
 
+				if (*psz == '\n') CurrentLineNumber++;
+
 				if (!IsWhitespace(*psz))
 				{
-					throw FormatException("Expected XML opening tag at top-level.");
+					throw FormatException("Expected XML opening tag at top-level at " + GetSource() + ".");
 				}
 			}
 
 			XmlDocument *pDocument = new XmlDocument();
 			try
 			{
+				pDocument->SourceLocation = sSourceFilename;
 				ParseNode(psz, pDocument);
 			}
 			catch (std::exception&)
@@ -78,6 +99,14 @@ namespace wb
 				throw;
 			}
 			return pDocument;
+		}
+
+		inline void XmlParser::SkipWhitespace(const char*& psz)
+		{
+			while (*psz && IsWhitespace(*psz)) {
+				if (*psz == '\n') CurrentLineNumber++;
+				psz++; 
+			}
 		}
 
 		inline void XmlParser::ParseNode(const char *&psz, XmlNode *pNode)
@@ -101,7 +130,7 @@ namespace wb
 				{
 					if (pNode->IsElement())
 					{
-						throw FormatException("Badly formed XML (no closing tag for '" + pNode->ToString() + "')");
+						throw FormatException("Badly formed XML (no closing tag for '" + pNode->ToString() + "' from " + pNode->SourceLocation + ")");
 					}
 
 					return;
@@ -110,23 +139,23 @@ namespace wb
 				if (*psz == '<') 
 				{
 					psz++;
-					while (*psz && IsWhitespace(*psz)) psz++;
+					SkipWhitespace(psz);
 					if (*psz == '/')
 					{
 						psz ++;
 						string CloseTagName;
 						if (!ParseClosingTag(psz, CloseTagName))
 						{
-							throw FormatException("Badly formed XML (closing tag '" + CloseTagName + "' is invalid)");
+							throw FormatException("Badly formed XML (closing tag '" + CloseTagName + "' at " + GetSource() + " is invalid)");
 						}
 						if (!pNode->IsElement())
 						{
-							throw FormatException("Badly formed XML (closing tag '" + CloseTagName + "' found inside '" + pNode->ToString() + "')");
+							throw FormatException("Badly formed XML (invalid closing tag '" + CloseTagName + "' found at " + GetSource() + " inside '" + pNode->ToString() + "' from " + pNode->SourceLocation + ")");
 						}
 						XmlElement *pElement = (XmlElement *)pNode;
 						if (!IsEqual(CloseTagName, pElement->LocalName))
 						{
-							throw FormatException("Badly formed XML (closing tag '" + CloseTagName + "' found inside element '" + pElement->LocalName + "')");
+							throw FormatException("Badly formed XML (mismatched closing tag '" + CloseTagName + "' at " + GetSource() + " found inside element '" + pElement->LocalName + "' from " + pElement->SourceLocation + ")");
 						}
 						return;
 					}
@@ -138,18 +167,18 @@ namespace wb
 						{
 							psz += strlen("[CDATA[");
 							XmlNode *pChild = ParseText(psz, true);
-							if (!pChild) throw FormatException("Badly-formed XML, illegal CDATA format.");
+							if (!pChild) throw FormatException("Badly-formed XML, illegal CDATA format at " + GetSource() + ".");
 							pNode->Children.push_back(pChild);
 							continue;
 						}
 						if (*psz != '-' || *(psz+1) != '-') 
 						{
-							throw FormatException("Badly formed XML (invalid comment tag found inside '" + pNode->ToString() + "')");
+							throw FormatException("Badly formed XML (invalid comment tag found at " + GetSource() + ").");
 						}
 						psz++; psz++;
 						if (!ParseComment(psz))
 						{
-							throw FormatException("Badly formed XML (invalid comment found inside '" + pNode->ToString() + ")");
+							throw FormatException("Badly formed XML (invalid comment found at " + GetSource() + ").");
 						}
 						continue;
 					}
@@ -159,7 +188,10 @@ namespace wb
 					continue;
 				}
 
-				if (IsWhitespace(*psz)) { psz++; continue; }
+				if (IsWhitespace(*psz)) { 
+					if (*psz == '\n') CurrentLineNumber++;
+					psz++; continue; 
+				}
 
 				// A character other than <, whitespace, or end of string has been found 
 				// inside the element.  Must be text!
@@ -180,7 +212,7 @@ namespace wb
 				// The < character may optionally have already been parsed.
 
 			if (*psz == '<') psz++;
-			while (*psz && IsWhitespace(*psz)) psz++;
+			SkipWhitespace(psz);
 			if (*psz == '/') return NULL;
 
 			string strName;
@@ -193,27 +225,28 @@ namespace wb
 			}
 
 			if (*psz == 0) {
-				throw FormatException("Improperly terminated XML tag (missing closing >) on tag '" + strName + "'");
+				throw FormatException("Improperly terminated XML tag (missing closing >) on tag '" + strName + "' at " + GetSource() + ".");
 			}
 
 			XmlElement *pElement = new XmlElement();
 			try
 			{
+				pElement->SourceLocation = GetSource();
 				pElement->LocalName = strName;
 
 				SpecialTag Special;
 				if (!ParseAttributes(psz, pElement, Special))
 				{
 					#ifdef _DEBUG
-					throw FormatException("Improperly formatted XML tag '" + strName + "'.  Context: \n" + string(pszAtStart).substr(0,100).c_str());
+					throw FormatException("Improperly formatted XML tag '" + strName + "' at " + GetSource() + ".  Context: \n" + string(pszAtStart).substr(0,100).c_str());
 					#else
-					throw FormatException("Improperly formatted XML tag '" + strName + "'.");
+					throw FormatException("Improperly formatted XML tag '" + strName + "' at " + GetSource() + ".");
 					#endif
 				}
 
 				if (Special == OpenAndClose) return pElement;	
 
-				while (*psz && IsWhitespace(*psz)) psz++;
+				SkipWhitespace(psz);
 				ParseNode(psz, pElement);
 				return pElement;
 			}
@@ -228,7 +261,7 @@ namespace wb
 
 			Special = Ordinary;
 
-			while (*psz && IsWhitespace(*psz)) psz++;	
+			SkipWhitespace(psz);
 
 			string	Name;
 			string	Current;
@@ -237,6 +270,8 @@ namespace wb
 			bool bParsingAttrName = false, bParsingAttrValue = false, bParsingString = false, bParsingEscapeCode = false;
 			for (; *psz != 0; psz++)
 			{
+				if (*psz == '\n') CurrentLineNumber++;
+
 				if (bParsingString)
 				{
 					if (*psz == '\"') { bParsingString = false; bParsingEscapeCode = false; Code.clear(); continue; }
@@ -290,7 +325,7 @@ namespace wb
 						{
 							if (*psz == '/') Special = OpenAndClose; else Special = Declaration;
 							psz ++;
-							while (*psz && IsWhitespace(*psz)) psz++;
+							SkipWhitespace(psz);
 							if (*psz != '>') return false;
 							psz ++;
 							return true;			
@@ -313,7 +348,7 @@ namespace wb
 				{
 					if (*psz == '/') Special = OpenAndClose; else Special = Declaration;
 					psz ++;
-					while (*psz && IsWhitespace(*psz)) psz++;
+					SkipWhitespace(psz);
 					if (*psz != '>') return false;
 					psz ++;
 					return true;			
@@ -332,13 +367,17 @@ namespace wb
 				// We will return one character past the > character (assuming no errors).
 				// Returns false on error, but does not set the last error.
 
-			while (*psz && IsWhitespace(*psz)) psz++;
+			SkipWhitespace(psz);			
 
 			CloseTagName = "";
 
 			for (; *psz != 0; psz++)
 			{		
-				if (IsWhitespace(*psz)) psz++;		
+				if (IsWhitespace(*psz)) {
+					if (*psz == '\n') CurrentLineNumber++;
+					psz++;
+					continue;
+				}
 				if (*psz == '>') { psz++; return true; }
 				CloseTagName += *psz;
 			}
@@ -354,6 +393,7 @@ namespace wb
 				// Returns NULL on error but does not set the last error string.			
 
 			XmlText *pText = new XmlText();
+			pText->SourceLocation = GetSource();
 
 			if (!CDATA)
 			{
@@ -362,12 +402,17 @@ namespace wb
 
 				for (; *psz != 0; psz++)
 				{
+					if (*psz == '\n') CurrentLineNumber++;
 					if (*psz == '<') return pText;
+					/** Microsoft's XML Parser apparently allows a > character given no < opener, and they even use 
+						it in some Visual Studio/MSBuild property files (xml).  I'm not sure how I feel about it, but
+						I need to parse Microsoft's XML files so guess I'm going with it.
 					if (*psz == '>')
 					{
 						delete pText;
 						return NULL;
 					}
+					**/
 
 					if (bParsingEscapeCode) {
 						if (*psz == ';') {
@@ -394,6 +439,7 @@ namespace wb
 			{				
 				for (; *psz != 0; psz++) 
 				{
+					if (*psz == '\n') CurrentLineNumber++;
 					if (*psz == ']' && *(psz+1) == ']' && *(psz+2) == '>') { psz += 3; return pText; }
 					pText->Text += *psz;
 				}
@@ -420,6 +466,7 @@ namespace wb
 
 			for (; *psz != 0; psz++)
 			{
+				if (*psz == '\n') CurrentLineNumber++;
 				if (*psz == '>')
 				{
 					psz++; return true;
@@ -438,6 +485,7 @@ namespace wb
 			int nMatch = 0;
 			for (; *psz != 0; psz++)
 			{
+				if (*psz == '\n') CurrentLineNumber++;
 				if (*psz == '-') { nMatch ++; continue; }
 				if (*psz == '>' && nMatch == 2) { psz++; return true; }
 				nMatch = 0;

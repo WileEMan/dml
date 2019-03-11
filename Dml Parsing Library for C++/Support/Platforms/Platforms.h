@@ -58,8 +58,8 @@ typedef signed long long Int64;
 #define Float_MaxValue		FLT_MAX
 #define Double_MaxValue		DBL_MAX
 
-#define Float_MinValue		FLT_MIN
-#define Double_MinValue		DBL_MIN
+#define Float_MinValue		(std::numeric_limits<float>::lowest())
+#define Double_MinValue		(std::numeric_limits<double>::lowest())
 
 static const size_t size_t_MaxValue = (size_t)-1;
 

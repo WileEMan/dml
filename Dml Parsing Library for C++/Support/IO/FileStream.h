@@ -52,10 +52,16 @@ namespace wb
 		}
 		enum_class_end(FileShare);
 
+		/// <summary>FileStream implements the abstract Stream class for reading/writing to files as streams.  The FileStream
+		/// provides binary-style file access, with no special translation of characters such as newlines or EOF indicators.
+		/// Other than new constructors for files and an Open() call, the FileStream class interface is identical to that of
+		/// Stream.  The FileStream class is modeled after the .NET System.IO.FileStream class and a google search will provide
+		/// similar examples (except this is native code and has no .NET dependency).</summary>
 		class FileStream : public Stream
 		{
 		protected:
-			#ifdef _WINDOWS
+
+			#if defined(_WINDOWS)
 			HANDLE m_Handle;
 			#else
 			int	m_Handle;
@@ -268,14 +274,12 @@ namespace wb
 				#if defined(_WINDOWS)
 				DWORD block_count;
 				if (!::ReadFile(m_Handle, pDstBuffer + count, (Int32)nLength, &block_count, nullptr)) Exception::ThrowFromWin32(::GetLastError());									
+				return (Int64)block_count + count;
 				#else
 				Int32 block_count = read(m_Handle, pDstBuffer + count, (Int32)nLength);				
-				#endif
 				if (block_count >= 0) return (Int64)block_count + count;
-				#if !defined(_WINDOWS)
 				Exception::ThrowFromErrno(errno);
 				#endif
-				throw Exception();
 			}
 
 			void WriteByte(byte ch) override 
@@ -366,13 +370,25 @@ namespace wb
 
 			void Close()
 			{
-				Flush();
+				// Flush();			// OS should be doing this at close anyway.
 				#if defined(_WINDOWS)
 				if (m_Handle != INVALID_HANDLE_VALUE) { ::CloseHandle(m_Handle); m_Handle = INVALID_HANDLE_VALUE; }
 				#else
 				if (m_Handle != -1) { close(m_Handle); m_Handle = -1; }
 				#endif
 				m_bCanRead = m_bCanWrite = false;
+			}
+
+			void Flush() override 
+			{
+				#if defined(_WINDOWS)
+				if (m_Handle != INVALID_HANDLE_VALUE) 
+				{
+					if (!::FlushFileBuffers(m_Handle)) Exception::ThrowFromWin32(::GetLastError());
+				}
+				#else
+				#error Needs implementation for linux here.
+				#endif
 			}
 
 			#if defined(_WINDOWS)

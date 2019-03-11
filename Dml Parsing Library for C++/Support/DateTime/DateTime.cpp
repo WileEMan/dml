@@ -50,9 +50,10 @@ namespace wb
 	/*static*/ const Int64  DateTime::g_nOffsetForFiletime
 						= (time_constants::g_nSecondsPerLeapYear * 389ll) + (time_constants::g_nSecondsPerNonLeapYear * 1212ll);
 
-	/*static*/ DateTime DateTime::Minimum = DateTime::GetMinimumValue();
-	/*static*/ DateTime DateTime::Maximum = DateTime::GetMaximumValue();
-	/*static*/ DateTime DateTime::Zero = DateTime(0,1,1, 0,0,0, DateTime::UTC);
+	// Avoid using static variables, they don't play well across DLL boundaries.
+	///*static*/ DateTime DateTime::Minimum = DateTime::GetMinimumValue();
+	///*static*/ DateTime DateTime::Maximum = DateTime::GetMaximumValue();
+	///*static*/ DateTime DateTime::Zero = DateTime(0,1,1, 0,0,0, DateTime::UTC);
 
 	/////////
 	//	DateTime Members
@@ -806,7 +807,7 @@ namespace wb
 			else return false;
 
 				// Skip past spaces, dashes, and month name until we get to the year.
-			while (iIndex < str.length() && !isnumeric(str[iIndex])) iIndex++;
+			while (iIndex < str.length() && !isdigit(str[iIndex])) iIndex++;
 			if (iIndex >= str.length()) return false;
 			Int32 nYear;
 			if (!Int32_TryParse(str.substr(iIndex).c_str(), NumberStyles::Integer, nYear)) return false;
@@ -823,7 +824,7 @@ namespace wb
 			while (iIndex < str.length() && !isspace(str[iIndex])) iIndex++;
 			if (iIndex >= str.length()) return false;
 				// Skip to the first numeric following the whitespace following the year.
-			while (iIndex < str.length() && !isnumeric(str[iIndex])) iIndex++;
+			while (iIndex < str.length() && !isdigit(str[iIndex])) iIndex++;
 			if (iIndex >= str.length()) return false;
 
 			str = str.substr(iIndex);

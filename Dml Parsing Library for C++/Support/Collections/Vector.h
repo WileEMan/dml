@@ -221,7 +221,7 @@ namespace wb
 			m_nLength = nNewSize;
 		}
 
-		size_type capacity() { return m_nCapacity; }
+		size_t capacity() { return m_nCapacity; }
 
 		void clear()
 		{

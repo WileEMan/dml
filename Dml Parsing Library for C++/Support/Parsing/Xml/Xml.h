@@ -24,6 +24,7 @@ namespace wb
 
 /**	Dependencies **/
 
+#include <memory>
 //#include "../../Common.h"
 //#include "../../Text/StringConversion.h"
 
@@ -33,6 +34,7 @@ namespace wb
 	{
 		/** XmlWriterOptions **/
 
+		/// <summary>XmlWriterOptions provides a set of control options for generating a string or stream from XML content.</summary>
 		class XmlWriterOptions
 		{
 		public:
@@ -52,11 +54,50 @@ namespace wb
 			
 			XmlWriterOptions(XmlWriterOptions&);
 			XmlWriterOptions(XmlWriterOptions&&);
-			XmlWriterOptions(bool AndContent = false);
+			XmlWriterOptions(bool AndContent = true);
+		};
+
+		/** JsonWriterOptions **/
+
+		/// <summary>JsonWriterOptions provides a set of control options for generating a JSON string or stream from XML content.</summary>
+		class JsonWriterOptions
+		{
+		public:			
+			/// <summary>[Default=0]  Indentation level for output text.</summary>
+			int		Indentation;						
+			
+			/// <summary>[Default=false] Allows the merging of multiple JSON "arrays" that would be created from the existence of repeated
+			/// element names but are not necessarily contiguous.  In XML, there is no concept of an array but elements can be repeated.  In
+			/// JSON an array is a specific thing and is the only way to properly repeat a value under the same name.  Therefore, there is not
+			/// a strict translation from XML to JSON in the case where an XML element tag gets repeated but with other tags interspersed.
+			/// In some formats, the sequencing can have meaning.  To enable this option potentially discards the XML sequencing by merging
+			/// all instances of the same XML element tag into the same array, discarding the information that there were other XML nodes
+			/// interspersed.  If this option if false, an error is generated instead of re-sequencing and only completely faithful XML->JSON 
+			/// representations can be created.</summary>
+			bool	MergeArrays;
+
+			/// <summary>[Default=true] Forces all XML Elements to be output as an array in JSON.  Since XML always allows an element to be
+			/// repeatable (except by schema), this setting assumes that any XML element represents an array in JSON.  To utilize this,
+			/// use attributes for any non-repeatable format and elements for any repeatable/variable-count information.  This option ensures
+			/// a more consistent JSON format.</summary>
+			bool	AlwaysArrays;
+
+			/// <summary>[Default=false] Ordinarily the top-level element is an object because in XML there can only be a single top-level element.
+			/// When using AlwaysArrays, the top-level element will receive special treatment in being the only XML element constructed as an
+			/// element instead of an array (even for elements with only a single instance).  With TopLevelAsArray, the top-level JSON will be
+			/// written as an array with a single entry for consistency instead of as an element.</summary>
+			bool	TopLevelAsArray;
+
+			JsonWriterOptions(bool MergeArrays = false, bool AlwaysArrays = true, bool TopLevelAsArray = false) { 
+				Indentation = 0; this->MergeArrays = MergeArrays; this->AlwaysArrays = AlwaysArrays; 
+				this->TopLevelAsArray = TopLevelAsArray;
+			}
 		};
 
 		/** XmlAttribute **/
 
+		/// <summary>XmlAttribute represents an in-memory attribute from XML.  For example, the node &lt;sample name=&quot;Wiley&quot;&gt; contains
+		/// a single attribute with Name "name" and Value "Wiley".</summary>
 		class XmlAttribute
 		{
 		public:
@@ -69,19 +110,30 @@ namespace wb
 
 		/** XmlNode **/
 
+		/// <summary>The XmlNode class contains the base for all xml node classes, including XmlElement (the most common node).  XmlDocument is
+		/// also based on XmlNode and provides the top-level container for a document or snippet.</summary>
 		class XmlNode
 		{
 		protected:
 			XmlNode();
-			virtual ~XmlNode();
 			
 			friend class	XmlParser;	
+			friend class	XmlElement;
 			static string	Escape(const XmlWriterOptions& Options, const string&);
+			static string	Escape(const JsonWriterOptions& Options, const string&);
 			static void		Indent(const XmlWriterOptions& Options, string& OnString);
+			static void		Indent(const JsonWriterOptions& Options, string& OnString);			
+			virtual string	ToJsonValue(JsonWriterOptions Options = JsonWriterOptions());
 
 		public:	
+			virtual ~XmlNode();
 
 			vector<XmlNode*>	Children;
+
+			/// <summary>ChildElements() retrieves the Children list where only XmlNodes that return IsElement()
+			/// of true are included, and are cast to XmlElement pointers.  Not part of the .NET Framework
+			/// version of this API.</summary>
+			vector<XmlElement*>	ChildElements();
 
 				/** FindChild(): Returns the first child element matching the specified tag name.
 					Returns NULL if no child elements match the tag name.  Descends exactly 
@@ -93,10 +145,21 @@ namespace wb
 					match the tag name. **/
 			XmlElement *FindNthChild(const char *pszTagName, int N);
 
-				/** Appends the specified node at the end of the list of child nodes.  The node must
-					have been created using XmlDocument.Create...() methods, and responsibility for
+				/** Appends the specified node at the end of the list of child nodes.  Responsibility for 
 					deleting the node becomes that of the XmlNode container after this call. **/
 			XmlNode *AppendChild(XmlNode *pNewChild);
+
+				/** Appends the specified node at the end of the list of child nodes.  Responsibility for 
+					deleting the node becomes that of the XmlNode container after this call. **/
+			XmlNode *AppendChild(std::unique_ptr<XmlNode>&& pNewChild);
+
+				/** Inserts the specified node at the given position in the list of child nodes.  Responsibility 
+					for deleting the node becomes that of the XmlNode container after this call. **/
+			XmlNode *InsertChild(int at_index, XmlNode *pNewChild);
+
+				/** Inserts the specified node at the given position in the list of child nodes.  Responsibility 
+					for deleting the node becomes that of the XmlNode container after this call. **/
+			XmlNode *InsertChild(int at_index, std::unique_ptr<XmlNode>&& pNewChild);
 
 				/** Removes the node matching the pointer given.  The memory associated with pChild is
 					not freed, however responsibility for freeing it (with delete) becomes that of the
@@ -118,15 +181,24 @@ namespace wb
 			virtual Type	GetType() = 0;
 			
 			virtual string	ToString(XmlWriterOptions Options = XmlWriterOptions());
+			virtual string	ToJson(JsonWriterOptions Options = JsonWriterOptions());
 
 			/// <summary>Creates a deep copy of this node, all children, and all attributes.  The caller assumes 
 			/// responsibility for delete'ing the returned node.  The returned copy is not attached to any
 			/// higher-level hierarchy and has no parent.</summary>
 			virtual XmlNode*	DeepCopy() = 0;
+
+			/// <summary>Available for more information during exceptions, the SourceLocation can be set by the parser to
+			/// later identify where an XmlNode originated from.  Note that an XmlNode created in code will not have a
+			/// SourceLocation and the string will be empty, and that providing a source file to the parser is also optional
+			/// and SourceLocation may identify only a line number.  When a source file is provided, the parser will 
+			/// typically use the format &lt;SourceFile&gt;:&lt;LineNumber&gt; such as SourceFile.xml:35.</summary>
+			string SourceLocation;
 		};
 
 		/** XmlDocument **/		
 
+		/// <summary>Represents the top-level xml container from a document or snippet.</summary>
 		class XmlDocument : public XmlNode
 		{		
 		public:
@@ -134,6 +206,7 @@ namespace wb
 			~XmlDocument() { }	
 
 			string ToString(XmlWriterOptions Options = XmlWriterOptions()) override;
+			string ToJson(JsonWriterOptions Options = JsonWriterOptions()) override;
 
 				/** GetDocumentElement() returns the top-level (root) element of 
 					this Xml document.  NULL is returned if the top-level element
@@ -153,6 +226,7 @@ namespace wb
 
 		/** XmlElement **/
 
+		/// <summary>XmlElement represents any xml element, which is a node that can contain other xml nodes and/or xml attributes.</summary>
 		class XmlElement : public XmlNode
 		{
 		protected:
@@ -160,6 +234,7 @@ namespace wb
 
 			friend class	XmlParser;	
 			friend class	XmlDocument;
+			string	ToJsonValue(JsonWriterOptions Options = JsonWriterOptions()) override;
 
 		public:
 			~XmlElement();
@@ -170,11 +245,11 @@ namespace wb
 
 				/** GetAttribute(): Returns the value for the attribute with the specified name.
 					Returns an empty string if the attribute is not found. **/
-			string			GetAttribute(const char *pszAttrName) const;
+			string			GetAttribute(const string& AttrName) const;
 
 				/** FindAttribute(): Returns the attribute with the specified name.  Returns NULL
 					if the attribute is not found. **/
-			XmlAttribute	*FindAttribute(const char *pszAttrName) const;
+			XmlAttribute	*FindAttribute(const string& AttrName) const;
 
 				/** GetAs...(pszAttrName, [Default Value]) helpers:
 					A series of convenient attribute conversion/access/find functions.  Each call 
@@ -268,13 +343,23 @@ namespace wb
 			XmlNode::Type	GetType() { return XmlNode::Type::Element; }
 
 			string			ToString(XmlWriterOptions Options = XmlWriterOptions()) override;
+			string			ToJson(JsonWriterOptions Options = JsonWriterOptions()) override;
 			XmlNode*		DeepCopy() override;
+
+			/// <summary>Creates a new XmlElement.  Note that this constructor is not available in the .NET API where all elements must
+			/// be created via XmlDocument.</summary>
+			XmlElement(const string& LocalName);
 		};
 
 		/** XmlText **/
 
+		/// <summary>XmlText represents a section of text as an xml node.  The text must be contained as a child within an
+		/// XmlElement.</summary>
 		class XmlText : public XmlNode
 		{		
+		protected:
+			string	ToJsonValue(JsonWriterOptions Options = JsonWriterOptions()) override;
+
 		public:	
 			XmlText() { }
 			~XmlText() { }
@@ -286,6 +371,7 @@ namespace wb
 			XmlNode::Type	GetType() { return XmlNode::Type::Text; }
 
 			string			ToString(XmlWriterOptions Options = XmlWriterOptions()) override;
+			string			ToJson(JsonWriterOptions Options = JsonWriterOptions()) override;
 			XmlNode*		DeepCopy() override;
 		};
 	}

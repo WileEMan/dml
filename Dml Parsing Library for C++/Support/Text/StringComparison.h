@@ -61,26 +61,28 @@ namespace wb
 	}
 
 		// i.e. StartsWith("A full string", "A full") will return true.
-	inline bool StartsWith(const char *psz, const char *pszSubstring) 
+	inline bool StartsWith(const string& str, const string& strSubstring) 
 	{ 
+		size_t ii = 0;
 		for (;;)
 		{
-			if (*pszSubstring == 0) return true;
-			if (*psz == 0) return false;
-			if (*psz != *pszSubstring) return false;
-			psz ++; pszSubstring ++;
+			if (ii >= strSubstring.length()) return true;
+			if (ii >= str.length()) return false;
+			if (str[ii] != strSubstring[ii]) return false;
+			ii++;
 		}
 	}
 
 		// i.e. StartsWith("A full string", "A FULL") will return true.
-	inline bool StartsWithNoCase(const char *psz, const char *pszSubstring) 
+	inline bool StartsWithNoCase(const string& str, const string& strSubstring) 
 	{ 
+		size_t ii = 0;
 		for (;;)
 		{
-			if (*pszSubstring == 0) return true;
-			if (*psz == 0) return false;
-			if (tolower(*psz) != tolower(*pszSubstring)) return false;
-			psz ++; pszSubstring ++;
+			if (ii >= strSubstring.length()) return true;
+			if (ii >= str.length()) return false;
+			if (tolower(str[ii]) != tolower(strSubstring[ii])) return false;
+			ii++;
 		}
 	}
 

@@ -33,6 +33,10 @@ namespace wb
 		static const double	g_dSecondsPerMinute			= 60.0 /*seconds/minute*/;
 		static const double	g_dSecondsPerHour			= 60.0 /*minutes/hour*/ * g_dSecondsPerMinute /*seconds/minute*/;
 		static const double	g_dSecondsPerDay			= 24.0 /*hours/day*/ * g_dSecondsPerHour /*seconds/hour*/;
+		static const double	g_dNanosecondsPerSecond		= 1000000000.0 /*ns/second*/;
+		static const double	g_dNanosecondsPerMinute		= 60.0 /*seconds/minute*/ * g_dNanosecondsPerSecond /*ns/second*/;		
+		static const double	g_dNanosecondsPerHour		= 60.0 /*minutes/hour*/ * g_dNanosecondsPerMinute /*ns/minute*/;		
+		static const double	g_dNanosecondsPerDay		= 24.0 /*hours/day*/ * g_dNanosecondsPerHour /*ns/hour*/;		
 		static const double	g_dApproxSecondsPerMonth	= 31.0 /*days/month*/ * g_dSecondsPerDay /*seconds/day*/;
 		static const double	g_dApproxSecondsPerYear		= 12.0 /*months/year*/ * g_dApproxSecondsPerMonth /*seconds/month*/;			
 		static const double g_dSecondsPerNanosecond		= 1.0e-9;

@@ -343,12 +343,9 @@ namespace wb
 			// Returns the bias, in seconds, applied when working in the local time zone.  UTC = Value + Bias.
 		static int	GetLocalBias();
 
-		static DateTime Minimum;					// Retrieves the lowest allowed DateTime value.
-		static DateTime Maximum;					// Retrieves the highest allowed DateTime value.
-		static DateTime Zero;						// Retrieves a zero DateTime value.  Often better than using "Minimum" to avoid rollovers.
-
-		static DateTime GetMinimumValue();
-		static DateTime GetMaximumValue();
+		static DateTime GetMinimumValue();					// Retrieves the lowest allowed DateTime value.
+		static DateTime GetMaximumValue();					// Retrieves the highest allowed DateTime value.
+		static DateTime GetZeroValue();						// Retrieves a zero DateTime value.  Often better than using "Minimum" to avoid rollovers.
 	};
 
 	#define DateTime_MinValue (DateTime::Minimum)
@@ -893,6 +890,7 @@ namespace wb
 
 	/*static*/ inline DateTime DateTime::GetMinimumValue() { DateTime ret; ret.m_nSeconds = Int64_MinValue; ret.m_nNanoseconds = 0; ret.m_nBias = 0; return ret; }
 	/*static*/ inline DateTime DateTime::GetMaximumValue() { DateTime ret; ret.m_nSeconds = Int64_MaxValue; ret.m_nNanoseconds = 0; ret.m_nBias = 0; return ret; }
+	/*static*/ inline DateTime DateTime::GetZeroValue() { return DateTime(0,1,1, 0,0,0, DateTime::UTC); }
 }
 
 #endif	// __DateTime_h__

@@ -53,24 +53,7 @@ namespace wb
 				throw DmlException(Message);
 			}
 
-			Int64 ToNanoseconds(const TimeSpan& Delta)
-			{				
-				Int64 Seconds = Delta.GetTotalSecondsNoRounding();
-				if (Seconds >= 0)
-				{
-					// Maximum supported date range for this routine is the maximum 64-bit value for seconds less one second to account for nanoseconds up to +1 second.
-					static const Int64 MaxSeconds = (Int64_MaxValue / time_constants::g_nNanosecondsPerSecond) - 1;
-					if (Seconds >= MaxSeconds) throw NotSupportedException(S("Date value is outside codec-supported range."));
-					return Seconds * time_constants::g_nNanosecondsPerSecond + Delta.GetNanoseconds();
-				}
-				else
-				{
-					// Minimum supported date range for this routine is the minimum 64-bit value for seconds plus one second to account for nanoseconds up to -1 second.
-					static const Int64 MinSeconds = (Int64_MinValue / time_constants::g_nNanosecondsPerSecond) + 1;
-					if (Seconds <= MinSeconds) throw NotSupportedException(S("Date value is outside codec-supported range."));
-					return Seconds * time_constants::g_nNanosecondsPerSecond - Delta.GetNanoseconds();
-				}
-			}
+			Int64 ToNanoseconds(const TimeSpan& Delta) { return Delta.GetTotalNanoseconds(); }
 
 			bool IsLEArray() 
 			{ 

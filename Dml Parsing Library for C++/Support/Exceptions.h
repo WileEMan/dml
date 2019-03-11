@@ -64,9 +64,7 @@ namespace std
 namespace wb
 {	
 	class Exception 
-#		ifdef UseSTL
 		: public std::exception
-#		endif
 	{
 	protected:
 		// Although the Microsoft implementation of std::exception includes a message,
@@ -89,9 +87,7 @@ namespace wb
 		Exception(const Exception &right) { Message = right.Message; }
 		Exception(Exception&& from) { Message = std::move(from.Message); }
 		Exception& operator=(const Exception &right) { 
-#			ifdef UseSTL
 			std::exception::operator=(right);
-#			endif
 			Message = right.Message; 
 			return *this; 
 		}

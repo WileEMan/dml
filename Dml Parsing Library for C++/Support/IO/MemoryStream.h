@@ -8,10 +8,14 @@
 #include "Streams.h"
 #include "../Memory Management/Buffer.h"
 
+
 namespace wb
 {
 	namespace io
 	{
+		/// <summary>MemoryStream implements the Stream abstract class using memory as the stream's backing store.  Reading and writing is performed into
+		/// a memory buffer, which expands as necessary to contain the full stream.  The MemoryStream class is modeled after the .NET System.IO.MemoryStream 
+		/// class and a google search will provide similar examples (except this is native code and has no .NET dependency).</summary>
 		class MemoryStream : public Stream
 		{
 			wb::memory::Buffer	m_Buffer;

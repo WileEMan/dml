@@ -1,6 +1,6 @@
 /////////
 //	XML Parser (Generation 4)
-//	Copyright (C) 2010-2014 by Wiley Black
+//	Copyright (C) 2010-2019 by Wiley Black
 ////
 //	A simplified XML Parser which operates in a single-pass and
 //	uses a minimal dependency set.  The parser utilizes linked lists
@@ -14,12 +14,12 @@
 //		- XML Namespaces
 //		- Partial/characterwise message parsing 
 //
-//	Some features not available in the XML specification include:
+//	Some features available here but not found in the XML specification include:
 //		- Multiple top-level elements permitted (automatically) if needed.
 //			This will manifest as the XmlDocument object containing multiple
 //			children.
 //
-//	Some features which are included:
+//	Other features included:
 //		- Support for comment parsing (comments are discarded)
 ////
 
@@ -56,6 +56,7 @@ namespace wb
 				Declaration
 			};
 
+			void SkipWhitespace(const char*& psz);
 			void ParseNode(const char *&psz, XmlNode* pNode);
 			XmlElement* ParseElement(const char *&psz);
 			bool ParseAttributes(const char *&psz, XmlElement* pElement, SpecialTag& Special);
@@ -66,18 +67,22 @@ namespace wb
 
 			bool IsWhitespace(char ch) { return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'; }
 
+			string CurrentSource;
+			int CurrentLineNumber;
+			string GetSource();
+
 		public:
 
 			XmlParser();
 			~XmlParser();
 
-			// The returned XmlElement has been allocated with new and should be delete'd when done.
-			// An exception is thrown on error.
-			XmlDocument *Parse(const char *psz);
+			/// <summary>Parses the string, which must contain an XML document or fragment.  An exception is thrown on error.</summary>
+			/// <returns>The returned XmlElement has been allocated with new and should be delete'd when done.</returns>
+			XmlDocument *Parse(const char *psz, const string& sSourceFilename = "");
 
-			// The returned XmlElement has been allocated with new and should be delete'd when done.
-			// An exception is thrown on error.
-			XmlDocument *Parse(wb::io::Stream& stream);
+			/// <summary>Parses the stream, which must contain an XML document or fragment.  An exception is thrown on error.</summary>
+			/// <returns>The returned XmlElement has been allocated with new and should be delete'd when done.</returns>			
+			XmlDocument *Parse(wb::io::Stream& stream, const string& sSourceFilename = "");
 		};
 	}
 }
