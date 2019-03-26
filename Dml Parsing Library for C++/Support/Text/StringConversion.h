@@ -300,7 +300,7 @@ namespace wb
 				if( dValue < 1.0 ) break;						// No more characters to show (except zeros)
 				if (WithCommas)
 				{
-					if (jj == 3){
+					if (jj == 2){
 						ret += S(",");
 						nChars ++;
 						jj = 0;
@@ -433,7 +433,7 @@ namespace wb
 				if (nValue < 1) break;						// No more characters to show
 				if (WithCommas)
 				{
-					if (jj == 3) { ret += S(","); jj = 0; nChars++; } else jj++;			
+					if (jj == 2) { ret += S(","); jj = 0; nChars++; } else jj++;			
 				}
 			}		
 			assert ((int)ret.length() <= format.MaxChars);
